@@ -1,8 +1,16 @@
 import cv2
 import numpy as np
 
-from dartcv.geometry import (CALIB_ANGLES, RADII, SECTORS, compute_homography, polar,
-                             project, score_from_image_point, score_from_model_point)
+from dartcv.geometry import (
+    CALIB_ANGLES,
+    RADII,
+    SECTORS,
+    compute_homography,
+    polar,
+    project,
+    score_from_image_point,
+    score_from_model_point,
+)
 from dartcv.overlay import draw_overlay, model_to_topdown, topdown_size_px, warp_topdown
 
 S = 4.0  # px per mm for the synthetic frontal render
@@ -19,10 +27,14 @@ def render_frontal(size=topdown_size_px()):
     idx = (ang // 18).astype(int) % 20
     even = idx % 2 == 0
     base = np.where(even[..., None], (20, 20, 20), (235, 235, 235)).astype(np.uint8)
-    ring = np.where(even[..., None], (40, 40, 210), (60, 160, 40)).astype(np.uint8)  # BGR
+    ring = np.where(even[..., None], (40, 40, 210), (60, 160, 40)).astype(
+        np.uint8
+    )  # BGR
     img[r <= RADII["double_outer"]] = base[r <= RADII["double_outer"]]
-    for lo, hi in ((RADII["treble_inner"], RADII["treble_outer"]),
-                   (RADII["double_inner"], RADII["double_outer"])):
+    for lo, hi in (
+        (RADII["treble_inner"], RADII["treble_outer"]),
+        (RADII["double_inner"], RADII["double_outer"]),
+    ):
         m = (r > lo) & (r <= hi)
         img[m] = ring[m]
     img[r <= RADII["outer_bull"]] = (60, 160, 40)
@@ -35,7 +47,8 @@ def synthetic_view():
     n = board.shape[0]
     persp = cv2.getPerspectiveTransform(
         np.float32([[0, 0], [n, 0], [n, n], [0, n]]),
-        np.float32([[120, 90], [700, 40], [760, 640], [60, 560]]))
+        np.float32([[120, 90], [700, 40], [760, 640], [60, 560]]),
+    )
     canvas = cv2.warpPerspective(board, persp, (820, 700), borderValue=(128, 128, 128))
     return canvas, persp @ m2i, board, m2i
 
@@ -53,11 +66,20 @@ def test_topdown_matches_frontal_render():
     top = warp_topdown(img, H_true)
     # Re-render expected top-down by mapping the frontal board into the output frame.
     size = topdown_size_px()
-    expected = cv2.warpPerspective(board, model_to_topdown() @ np.linalg.inv(m2i), (size, size),
-                                   borderValue=(128, 128, 128))
+    expected = cv2.warpPerspective(
+        board,
+        model_to_topdown() @ np.linalg.inv(m2i),
+        (size, size),
+        borderValue=(128, 128, 128),
+    )
     inside = np.zeros((size, size), bool)
-    cv2.circle(inside.view(np.uint8), (size // 2, size // 2),
-               int((RADII["double_outer"] - 3) * 4), 1, -1)
+    cv2.circle(
+        inside.view(np.uint8),
+        (size // 2, size // 2),
+        int((RADII["double_outer"] - 3) * 4),
+        1,
+        -1,
+    )
     diff = np.abs(top.astype(int) - expected.astype(int)).max(axis=2)
     assert (diff[inside] > 60).mean() < 0.05  # only wire-edge pixels may differ
 
@@ -81,6 +103,7 @@ def test_scoring():
 
 def test_auto_detection_recovers_homography():
     from dartcv.detect import detect_board
+
     img, H_true, _, _ = synthetic_view()
     det = detect_board(img)
     probe = [polar(r, a) for r in (50, 100, 165) for a in (0, 90, 200, 300)]
@@ -90,6 +113,7 @@ def test_auto_detection_recovers_homography():
 
 def test_auto_detection_with_tilted_camera():
     from dartcv.detect import detect_board
+
     img, H_true, _, _ = synthetic_view()
     h, w = img.shape[:2]
     R = cv2.getRotationMatrix2D((w / 2, h / 2), 12, 1.0)
@@ -115,5 +139,7 @@ def test_cli_defaults_to_raw_board_directory(tmp_path, monkeypatch):
     main(["--out", str(output_dir)])
 
     assert {path.name for path in (output_dir / "board").iterdir()} == {
-        "overlay.png", "topdown.png", "topdown_overlay.png"
+        "overlay.png",
+        "topdown.png",
+        "topdown_overlay.png",
     }
