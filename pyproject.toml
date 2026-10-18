@@ -8,9 +8,12 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography>=42.0.0",
+    "dvc[gdrive]>=3.67.1",
     "matplotlib>=3.11.2",
     "numpy>=2.5.4",
     "opencv-python>=5.0.0.93",
+    "pyopenssl>=24.0.0",
 ]
 
 [project.scripts]
