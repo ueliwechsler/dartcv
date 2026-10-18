@@ -100,3 +100,20 @@ def test_auto_detection_with_tilted_camera():
     probe = [polar(r, a) for r in (50, 100, 165) for a in (0, 90, 200, 300)]
     err = np.linalg.norm(project(det.H, probe) - project(H_t, probe), axis=1).max()
     assert err < 3.0
+
+
+def test_cli_defaults_to_raw_board_directory(tmp_path, monkeypatch):
+    from dartcv.cli import main
+
+    monkeypatch.chdir(tmp_path)
+    image_dir = tmp_path / "data" / "images" / "raw_board"
+    image_dir.mkdir(parents=True)
+    img, *_ = synthetic_view()
+    assert cv2.imwrite(str(image_dir / "board.jpg"), img)
+
+    output_dir = tmp_path / "out"
+    main(["--out", str(output_dir)])
+
+    assert {path.name for path in (output_dir / "board").iterdir()} == {
+        "overlay.png", "topdown.png", "topdown_overlay.png"
+    }

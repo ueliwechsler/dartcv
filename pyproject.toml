@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Benjamin Estermann", email = "benjamin.estermann@bluewin.ch" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "cryptography>=42.0.0",
     "dvc[gdrive]>=3.67.1",
@@ -15,8 +15,6 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pyopenssl>=24.0.0",
 ]
-requires-python = ">=3.13"
-dependencies = ["matplotlib>=3.11.2", "numpy>=2.5.4", "opencv-python>=5.0.0.93"]
 
 [project.scripts]
 dartcv = "dartcv.cli:main"
