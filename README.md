@@ -2,6 +2,68 @@
 
 WIP: Dart computer vision framework enabling a smart phone to count your darts score automatically.
 
+## Board detection and diagnostic images
+
+For a quick single-image check, run
+`uv run dartcv data/images/raw_board/IMG_2092.jpg --out out/IMG_2092`.
+An explicit image path writes directly into the supplied output directory.
+Running `uv run dartcv --out out` instead processes the entire directory
+`data/images/raw_board/`, writing results into `out/<image-stem>/`.
+
+Alongside `overlay.png`, `topdown.png`, and `topdown_overlay.png`, automatic
+detection writes these numbered pipeline visualizations:
+
+| Image | What it shows |
+| --- | --- |
+| `01_colour_mask.png` | Red/green segmentation after morphological cleanup, highlighted over a dimmed source image. |
+| `02_outer_ellipse.png` | Sampled outer boundary of the largest colour component: retained points in green, rejected points in red, fitted ellipse in yellow. |
+| `03_initial_alignment.png` | Initial board model after fitting the ellipse, applying the measured bull constraint when available, and estimating rotation from the alternating red/green double-ring pattern. |
+| `04_ecc_edges.png` | Actual image gradients and cyan wire-template gradients at the last attempted ECC scale, shown in the initial top-down frame before refinement. Off-board areas are masked out. The caption reports ECC acceptance and its correlation before the final bull constraint. |
+| `05_calibration.png` | Colour-coded **20/1, 6/10, 3/19, and 11/14** wires, with crosses at their outer-double-ring intersections. Grey circles show the initial estimate and connecting lines show the change after refinement. |
+| `06_bull_alignment.png` | Close-up comparing the ellipse-only seed with the final constrained homography. Cyan marks the independently measured red boundary; coloured rings show the model. Centre residuals are in original-image pixels relative to colour detection, not annotated ground truth. If detection is unreliable, a caption reports that no bull constraint was applied. |
+| `07_ring_alignment.png` | Double/treble close-ups before and after colour-band refinement. Orange shows the previous nominal rings; green shows independently fitted inner and outer paint boundaries, excluding grey metal. Reported residuals measure agreement with sampled colour transitions, not annotated ground truth. |
+
+**Automatic detection does not independently measure those four intersections.**
+It estimates the homography from the colour-region ellipse, independently detected
+bull, and rotation, then refines it using board-only image gradients (ECC) and
+measured colour-band centres. The labelled radial-wire angles are still
+**projections of the model**; their endpoints use the fitted coloured outer-double
+boundary when available, rather than an independently detected wire intersection.
+The colour pattern repeats every 36 degrees; use `--upright` to resolve orientation
+when the 20 is not near the top of the image.
+
+The bull is measured from an original-resolution crop: a compact red inner bull
+must have a green surround and plausible size/shape. Its centre constrains a
+projective correction that preserves the outer-double ellipse instead of simply
+translating the overlay. The constraint is applied before rotation estimation and
+again after ECC so the final model centre remains on the measured bull. When the
+bull is occluded or cannot be identified confidently, detection continues without
+this constraint and reports the fallback. The fitted small red ellipse centre is
+an approximation to the projected bull centre, not a calibrated ground-truth point.
+
+Double and treble bands are measured from full-resolution red/green radial strips,
+without dilating the colour mask or relying on grey/metal gradients. Spokes near
+sector wires are skipped. Both sides of a plausible-width coloured band must be
+visible, with support distributed around the board. Robust refinement uses band
+centres to correct common scale/perspective while holding the bull fixed. Each
+paint boundary is then fitted separately, because a single homography cannot
+account for every difference between actual coloured widths and nominal wire-based
+radii. Grey metal therefore does not become part of the coloured scoring band.
+
+The fitted boundaries are available through `Detection.rings` and used in both
+source and top-down overlays, including where radial lines end. Occluded spokes
+are omitted; unreliable bands retain nominal boundaries. Smooth ellipses bridge
+wire gaps and small occlusions, so these are fitted boundaries rather than a
+pixel-perfect segmentation. The existing `score_from_model_point` and
+`score_from_image_point` helpers still use standard radii, not these independently
+measured paint contours.
+
+With `--manual` or `--points`, the homography is instead computed from the four
+supplied intersections. These modes write the three standard images and
+`05_calibration.png`, labelled as supplied points; automatic-stage images are
+not generated. Use a fresh output directory when comparing different modes to
+avoid confusing older images with a new run.
+
 ## Pictures on Google Drive (uv + DVC)
 
 Pictures in `data/images/` are managed by DVC, not committed directly to Git.

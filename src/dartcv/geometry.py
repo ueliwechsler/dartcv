@@ -57,6 +57,13 @@ def project(H: np.ndarray, pts) -> np.ndarray:
     return cv2.perspectiveTransform(p, H).reshape(-1, 2)
 
 
+def contour_radius(H: np.ndarray, contour: np.ndarray, angles):
+    """Radius of an image-space ring contour along model-space ray angles."""
+    points = project(np.linalg.inv(H), contour)
+    bearings = np.degrees(np.arctan2(points[:, 0], -points[:, 1])) % 360
+    return np.interp(angles, bearings, np.linalg.norm(points, axis=1), period=360)
+
+
 def score_from_model_point(x_mm: float, y_mm: float) -> int:
     """Score of a point in model (mm) coordinates."""
     r = math.hypot(x_mm, y_mm)

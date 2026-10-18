@@ -1,4 +1,4 @@
-"""CLI: click 4 calibration points, write overlay and top-down images."""
+"""CLI: detect or calibrate a board and write results and pipeline overlays."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 
 from .detect import DetectionError, detect_board
+from .diagnostics import calibration_overlay, detection_overlays
 from .geometry import CALIB_NAMES, compute_homography
 from .overlay import draw_overlay, topdown_overlay, warp_topdown
 
@@ -72,13 +73,14 @@ def _process_image(image_path: Path, output_dir: Path, args) -> bool:
         )
         return False
 
+    det = None
     if args.points:
         H = compute_homography(list(zip(args.points[0::2], args.points[1::2])))
     elif args.manual:
         H = compute_homography(pick_points(img))
     else:
         try:
-            det = detect_board(img, upright_deg=args.upright)
+            det = detect_board(img, upright_deg=args.upright, diagnostics=True)
         except DetectionError as exc:
             print(
                 f"auto-detection failed for {image_path} ({exc}); retry with --manual",
@@ -86,21 +88,34 @@ def _process_image(image_path: Path, output_dir: Path, args) -> bool:
             )
             return False
         H = det.H
-        print(f"{image_path}: detected board (ECC score: {det.ecc_score})")
+        bull_status = (
+            "independently detected"
+            if det.bull is not None
+            else "not found; unconstrained"
+        )
+        print(
+            f"{image_path}: detected board (ECC score: {det.ecc_score}; "
+            f"bull: {bull_status}; coloured ring edges: {len(det.rings)}/4)"
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    ring_contours = (
+        {} if det is None else {name: ring.contour for name, ring in det.rings.items()}
+    )
     outputs = {
-        "overlay.png": draw_overlay(img, H),
+        "overlay.png": draw_overlay(img, H, ring_contours=ring_contours),
         "topdown.png": warp_topdown(img, H),
-        "topdown_overlay.png": topdown_overlay(img, H),
+        "topdown_overlay.png": topdown_overlay(img, H, ring_contours=ring_contours),
     }
+    if det is not None:
+        outputs.update(detection_overlays(img, det))
+    else:
+        outputs["05_calibration.png"] = calibration_overlay(img, H, supplied=True)
     for name, output in outputs.items():
         if not cv2.imwrite(str(output_dir / name), output):
             print(f"could not write {output_dir / name}", file=sys.stderr)
             return False
-    print(
-        f"{image_path}: wrote overlay.png, topdown.png, topdown_overlay.png to {output_dir}/"
-    )
+    print(f"{image_path}: wrote {', '.join(outputs)} to {output_dir}/")
     return True
 
 

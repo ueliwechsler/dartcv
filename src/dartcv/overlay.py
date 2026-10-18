@@ -5,7 +5,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .geometry import RADII, SECTORS, polar, project
+from .geometry import RADII, SECTORS, contour_radius, polar, project
 
 TOPDOWN_SCALE = 4  # output pixels per mm
 _MARGIN_MM = 25.0  # room for the number ring
@@ -22,16 +22,25 @@ def model_to_topdown() -> np.ndarray:
     return np.float64([[s, 0, c], [0, s, c], [0, 0, 1]])
 
 
-def draw_overlay(img, H, color=(0, 255, 0), thickness=1, numbers=True):
-    """Draw rings, wires and sector numbers through homography H (model->image)."""
+def draw_overlay(img, H, color=(0, 255, 0), thickness=1, numbers=True, ring_contours=None):
+    """Draw the model, optionally replacing nominal rings by measured colour edges.
+
+    ring_contours maps radius names to fitted contours in this image's pixels.
+    """
     out = img.copy()
     angles = np.linspace(0, 360, 361)
-    for r in RADII.values():
-        poly = project(H, [polar(r, a) for a in angles])
+    ring_contours = ring_contours or {}
+    for name, r in RADII.items():
+        poly = ring_contours.get(name)
+        if poly is None:
+            poly = project(H, [polar(r, a) for a in angles])
         cv2.polylines(out, [np.round(poly).astype(np.int32)], True, color, thickness, cv2.LINE_AA)
     for k in range(20):
         a = 9 + 18 * k
-        p = project(H, [polar(RADII["outer_bull"], a), polar(RADII["double_outer"], a)])
+        radius = RADII["double_outer"]
+        if "double_outer" in ring_contours:
+            radius = contour_radius(H, ring_contours["double_outer"], a)
+        p = project(H, [polar(RADII["outer_bull"], a), polar(radius, a)])
         p1, p2 = (tuple(int(round(v)) for v in q) for q in p)
         cv2.line(out, p1, p2, color, thickness, cv2.LINE_AA)
     if numbers:
@@ -51,7 +60,10 @@ def warp_topdown(img, H):
     return cv2.warpPerspective(img, M, (size, size), flags=cv2.INTER_LINEAR)
 
 
-def topdown_overlay(img, H, **kw):
+def topdown_overlay(img, H, *, ring_contours=None, **kw):
     """Top-down image with the model drawn on it."""
     M = model_to_topdown()
-    return draw_overlay(warp_topdown(img, H), M, **kw)
+    contours = None if ring_contours is None else {
+        name: project(M @ np.linalg.inv(H), points) for name, points in ring_contours.items()
+    }
+    return draw_overlay(warp_topdown(img, H), M, ring_contours=contours, **kw)
