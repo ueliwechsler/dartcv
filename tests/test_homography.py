@@ -231,7 +231,9 @@ def test_diagnostic_ecc_inputs_survive_failed_or_rejected_refinement(
     np.testing.assert_array_equal(debug.H_before_rings, det.H_initial)
     # Colour-ring refinement remains available even when ECC falls back.
     assert len(det.rings) == 4
-    np.testing.assert_allclose(project(det.H, [[0, 0]]), project(det.H_initial, [[0, 0]]), atol=1e-4)
+    np.testing.assert_allclose(
+        project(det.H, [[0, 0]]), project(det.H_initial, [[0, 0]]), atol=1e-4
+    )
     gray = cv2.cvtColor(warp_topdown(img, det.H_initial), cv2.COLOR_BGR2GRAY).astype(
         np.float32
     )

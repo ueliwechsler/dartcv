@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [
-    { name = "Benjamin Estermann", email = "benjamin.estermann@bluewin.ch" }
+    { name = "Benjamin Estermann", email = "benjamin.estermann@bluewin.ch" },
 ]
 requires-python = ">=3.13"
 dependencies = [
@@ -24,7 +24,7 @@ dartcv = "dartcv.cli:main"
 package = true
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -34,7 +34,4 @@ requires = ["uv_build>=0.13.1,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
-dev = [
-    "ipykernel>=7.4.0",
-    "pytest>=8",
-]
+dev = ["ipykernel>=7.4.0", "pytest>=8"]

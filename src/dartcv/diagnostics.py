@@ -64,7 +64,11 @@ def calibration_overlay(img, H, *, initial_H=None, supplied=False, ring_contours
         wire = [polar(RADII["outer_bull"], angle), polar(radius, angle)]
         start, end = np.round(project(H, wire)).astype(int)
         if initial_H is not None:
-            previous = tuple(np.round(project(initial_H, [polar(RADII["double_outer"], angle)])[0]).astype(int))
+            previous = tuple(
+                np.round(
+                    project(initial_H, [polar(RADII["double_outer"], angle)])[0]
+                ).astype(int)
+            )
             cv2.circle(
                 out, previous, 9 * scale, (160, 160, 160), 2 * scale, cv2.LINE_AA
             )
@@ -95,7 +99,9 @@ def calibration_overlay(img, H, *, initial_H=None, supplied=False, ring_contours
     )
     lines = [kind]
     if initial_H is not None:
-        lines.append("Grey circles: initial estimate; crosses: final coloured outer edge")
+        lines.append(
+            "Grey circles: initial estimate; crosses: final coloured outer edge"
+        )
     return _caption(out, *lines)
 
 
@@ -166,21 +172,31 @@ def ring_alignment_overlay(img: np.ndarray, detection: Detection) -> np.ndarray:
     """Show before/after colour-boundary close-ups without using grey wire edges."""
     debug = detection.diagnostics
     if not detection.rings or debug is None or debug.H_before_rings is None:
-        return _caption(img.copy(), "7. Insufficient colour-band coverage; nominal rings retained")
+        return _caption(
+            img.copy(), "7. Insufficient colour-band coverage; nominal rings retained"
+        )
     rows = []
     for band in ("double", "treble"):
         names = (f"{band}_inner", f"{band}_outer")
         if not all(name in detection.rings for name in names):
             continue
         angle = 18.0  # middle of a coloured sector, away from radial metal wires
-        radii = [contour_radius(detection.H, detection.rings[name].contour, angle) for name in names]
+        radii = [
+            contour_radius(detection.H, detection.rings[name].contour, angle)
+            for name in names
+        ]
         edges = project(detection.H, [polar(r, angle) for r in radii])
         centre = edges.mean(axis=0)
         reach = max(25.0, float(np.linalg.norm(edges[1] - edges[0])) * 2.5)
         size = 720
         scale = size / (2 * reach)
-        crop = np.array([[scale, 0, size / 2 - scale * centre[0]],
-                         [0, scale, size / 2 - scale * centre[1]], [0, 0, 1]])
+        crop = np.array(
+            [
+                [scale, 0, size / 2 - scale * centre[0]],
+                [0, scale, size / 2 - scale * centre[1]],
+                [0, 0, 1],
+            ]
+        )
         source = cv2.warpPerspective(img, crop, (size, size))
         panels = []
         for measured in (False, True):
@@ -190,17 +206,27 @@ def ring_alignment_overlay(img: np.ndarray, detection: Detection) -> np.ndarray:
                 if measured:
                     contour = ring.contour
                 else:
-                    contour = project(debug.H_before_rings, [polar(RADII[name], a) for a in range(361)])
+                    contour = project(
+                        debug.H_before_rings,
+                        [polar(RADII[name], a) for a in range(361)],
+                    )
                 points = np.round(project(crop, contour)).astype(np.int32)
                 colour = (0, 255, 0) if measured else (0, 180, 255)
                 cv2.polylines(panel, [points], True, colour, 2, cv2.LINE_AA)
             panel = cv2.copyMakeBorder(panel, 85, 0, 0, 0, cv2.BORDER_CONSTANT)
             if measured:
                 errors = [detection.rings[name].median_error_px for name in names]
-                lines = (f"{band.title()}: fitted coloured edges", "Grey metal excluded; bull remains anchored",
-                         f"Median fit residuals: {errors[0]:.2f} / {errors[1]:.2f} source px")
+                lines = (
+                    f"{band.title()}: fitted coloured edges",
+                    "Grey metal excluded; bull remains anchored",
+                    f"Median fit residuals: {errors[0]:.2f} / {errors[1]:.2f} source px",
+                )
             else:
-                lines = (f"{band.title()}: previous nominal rings", "Before colour-band refinement", "Same source crop in both panels")
+                lines = (
+                    f"{band.title()}: previous nominal rings",
+                    "Before colour-band refinement",
+                    "Same source crop in both panels",
+                )
             _caption(panel, *lines)
             panels.append(panel)
         rows.append(np.hstack(panels))
@@ -253,8 +279,9 @@ def detection_overlays(img: np.ndarray, detection: Detection) -> dict[str, np.nd
     )
 
     ring_contours = {name: ring.contour for name, ring in detection.rings.items()}
-    calibration = calibration_overlay(img, detection.H, initial_H=detection.H_initial,
-                                      ring_contours=ring_contours)
+    calibration = calibration_overlay(
+        img, detection.H, initial_H=detection.H_initial, ring_contours=ring_contours
+    )
     result = {
         "01_colour_mask.png": segmented,
         "02_outer_ellipse.png": ellipse,

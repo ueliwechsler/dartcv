@@ -22,7 +22,9 @@ def model_to_topdown() -> np.ndarray:
     return np.float64([[s, 0, c], [0, s, c], [0, 0, 1]])
 
 
-def draw_overlay(img, H, color=(0, 255, 0), thickness=1, numbers=True, ring_contours=None):
+def draw_overlay(
+    img, H, color=(0, 255, 0), thickness=1, numbers=True, ring_contours=None
+):
     """Draw the model, optionally replacing nominal rings by measured colour edges.
 
     ring_contours maps radius names to fitted contours in this image's pixels.
@@ -34,7 +36,9 @@ def draw_overlay(img, H, color=(0, 255, 0), thickness=1, numbers=True, ring_cont
         poly = ring_contours.get(name)
         if poly is None:
             poly = project(H, [polar(r, a) for a in angles])
-        cv2.polylines(out, [np.round(poly).astype(np.int32)], True, color, thickness, cv2.LINE_AA)
+        cv2.polylines(
+            out, [np.round(poly).astype(np.int32)], True, color, thickness, cv2.LINE_AA
+        )
     for k in range(20):
         a = 9 + 18 * k
         radius = RADII["double_outer"]
@@ -48,8 +52,16 @@ def draw_overlay(img, H, color=(0, 255, 0), thickness=1, numbers=True, ring_cont
             x, y = project(H, [polar(RADII["double_outer"] + 13, i * 18)])[0]
             text = str(n)
             (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            cv2.putText(out, text, (int(x - w / 2), int(y + h / 2)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
+            cv2.putText(
+                out,
+                text,
+                (int(x - w / 2), int(y + h / 2)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
     return out
 
 
@@ -63,7 +75,12 @@ def warp_topdown(img, H):
 def topdown_overlay(img, H, *, ring_contours=None, **kw):
     """Top-down image with the model drawn on it."""
     M = model_to_topdown()
-    contours = None if ring_contours is None else {
-        name: project(M @ np.linalg.inv(H), points) for name, points in ring_contours.items()
-    }
+    contours = (
+        None
+        if ring_contours is None
+        else {
+            name: project(M @ np.linalg.inv(H), points)
+            for name, points in ring_contours.items()
+        }
+    )
     return draw_overlay(warp_topdown(img, H), M, ring_contours=contours, **kw)
