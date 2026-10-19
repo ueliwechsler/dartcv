@@ -4,16 +4,18 @@ Pipeline
 1. Segment saturated red/green pixels (double/treble rings, bull).
 2. Find the outer edge of the double ring along rays from the blob centre and
    fit an ellipse (iteratively rejecting outliers).
-3. Resolve the board rotation from the alternating red/green double-ring
+3. Independently locate the red bull inside its green surround and correct
+    interior perspective while preserving the outer double-ring conic.
+4. Resolve the board rotation from the alternating red/green double-ring
    pattern. That pattern repeats every 36 deg, so the candidate with the 20
    closest to the image "up" direction is chosen (override with `upright_deg`).
-4. Independently locate the red bull inside its green surround and correct
-    interior perspective while preserving the outer double-ring conic.
 5. Refine against board-only image gradients with ECC, then reapply the bull
     constraint so global correlation cannot displace the measured centre.
 6. Measure undilated red/green double and treble bands at source resolution,
    refine their shared geometry without moving the bull, and fit paint edges
    separately from the nominal wire dimensions.
+
+See docs/cv-pipeline.md for contracts, acceptance rules, and fallbacks.
 """
 
 from __future__ import annotations
