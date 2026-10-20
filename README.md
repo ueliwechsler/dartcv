@@ -71,6 +71,19 @@ supplied intersections. These modes write the three standard images and
 not generated. Use a fresh output directory when comparing different modes to
 avoid confusing older images with a new run.
 
+## Dart recognition notebook
+
+[examples/dart_recognition.ipynb](examples/dart_recognition.ipynb) walks one image
+(default: a photo from `data/images/single_dart/`, set via `IMAGE_PATH`) through
+board detection, rectification, dart/number/tip recognition slots, scoring, and a
+combined view. Use the project's `dartcv` kernel.
+
+Only the board stages are implemented. Dart detection, number reading, and tip
+localisation have backend slots (`DART_DETECTOR`, `NUMBER_READER`, `TIP_LOCATOR`)
+that are unset, so those stages report `not configured`; no boxes, readings,
+tips, or scores are produced. Scores can be computed for hand-picked
+`MANUAL_TIPS`, using the standard board radii.
+
 ## Pictures on Google Drive (uv + DVC)
 
 Pictures in `data/images/` are managed by DVC, not committed directly to Git.

@@ -18,6 +18,7 @@ or implement a complete live scoring application.
 | [overlay](../src/dartcv/overlay.py) | Source-image overlays and top-down warping, optionally using fitted paint contours | `draw_overlay()`, `warp_topdown()`, `topdown_overlay()`; geometry and OpenCV |
 | [diagnostics](../src/dartcv/diagnostics.py) | Visual explanations of detection and supplied calibration | `detection_overlays()`, `calibration_overlay()`; consumes detector results |
 | [board](../src/dartcv/board.py) | Synthetic visualization in normalized coordinates | Rendering helpers used by the [example notebook](../examples/dartboard_visualization.ipynb); not the detector's metric model |
+| [recognition notebook](../examples/dart_recognition.ipynb) | Staged single-image workflow: board detection, rectification, recognition result contracts, scoring, annotation | Calls `detect_board()`, overlays, and `score_from_image_point()`; dart, number, and tip backends are unset slots, so those stages report `not configured` |
 
 ## Runtime and data flow
 
