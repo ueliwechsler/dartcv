@@ -78,11 +78,54 @@ avoid confusing older images with a new run.
 board detection, rectification, dart/number/tip recognition slots, scoring, and a
 combined view. Use the project's `dartcv` kernel.
 
-Only the board stages are implemented. Dart detection, number reading, and tip
-localisation have backend slots (`DART_DETECTOR`, `NUMBER_READER`, `TIP_LOCATOR`)
-that are unset, so those stages report `not configured`; no boxes, readings,
-tips, or scores are produced. Scores can be computed for hand-picked
-`MANUAL_TIPS`, using the standard board radii.
+Stage 4 defaults to the experimental classical single-dart detector in
+[src/dartcv/classical_darts.py](src/dartcv/classical_darts.py). It combines local
+colour/bright-flight contrast with attached parallel shaft edges, using the
+calibrated board to limit the search and reject paint confounders. It requires
+no optional runtime or model downloads. Configure `CLASSICAL_FLIGHT_HSV`,
+`CLASSICAL_WORK_SIZE`, `CLASSICAL_MIN_SCORE`, and `CLASSICAL_AMBIGUITY_MARGIN`
+in the contracts cell. `SHOW_CLASSICAL_DIAGNOSTICS` displays the search region,
+flight mask, line segments and ranked explanations. Quality scores are heuristic,
+not probabilities. It returns at most one box and abstains for weak or ambiguous
+evidence; it does not certify that exactly one dart exists.
+
+The current default photograph produces an abstention, not a correct box:
+board markings compete with the flight/shaft evidence. This is a constrained
+prototype, not established real-image detection accuracy. Dark flights, merged
+paint components, thin shafts and occlusions remain important limitations.
+
+The existing OWLv2 backend remains available for a pretrained comparison. Install
+its optional runtime:
+
+```sh
+uv sync --extra dart-detection --group dev
+```
+
+The first inference downloads model weights (hundreds of MB) into the local
+Hugging Face cache, not the repository or DVC dataset. The model runs locally;
+photos are not uploaded. Model weights use Apache-2.0 licensing. The default
+revision is pinned in [src/dartcv/dart_detection.py](src/dartcv/dart_detection.py).
+Construction/import does not download; `local_files_only=True` on the adapter
+forbids downloads and requires a populated cache. CPU is its tested default.
+
+To compare it, assign `DART_DETECTOR = Owlv2DartDetector()` after importing that
+class from `dartcv.dart_detection` and running the classical setup. Re-running
+the setup restores the classical backend. The notebook caches one classical
+detector while its settings and `H` match. A kernel restart clears it. Set
+`ENABLE_DART_DETECTION = False` to skip detection. Core CLI behavior is unchanged.
+OWLv2 is experimental: a flight-only box or a box around the board is not a
+successful whole-dart detection. Its scores are not accuracy probabilities.
+
+Number reading and tip localisation still have unset backend slots and report
+`not configured`. Boxes alone never produce scores. Scores can be computed for
+hand-picked `MANUAL_TIPS`, using the standard board radii.
+
+Reusable contracts, validation, and backend execution live in
+[src/dartcv/recognition.py](src/dartcv/recognition.py); drawing helpers live in
+[src/dartcv/recognition_overlay.py](src/dartcv/recognition_overlay.py).
+The notebook imports these helpers and keeps only configuration and presentation.
+See the [recognition roadmap](docs/cv-pipeline.md#recognition-contracts-and-next-detection-stage)
+for the proposed box/tip annotation, model integration, and evaluation sequence.
 
 ## Pictures on Google Drive (uv + DVC)
 

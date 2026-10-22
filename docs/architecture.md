@@ -18,7 +18,11 @@ or implement a complete live scoring application.
 | [overlay](../src/dartcv/overlay.py) | Source-image overlays and top-down warping, optionally using fitted paint contours | `draw_overlay()`, `warp_topdown()`, `topdown_overlay()`; geometry and OpenCV |
 | [diagnostics](../src/dartcv/diagnostics.py) | Visual explanations of detection and supplied calibration | `detection_overlays()`, `calibration_overlay()`; consumes detector results |
 | [board](../src/dartcv/board.py) | Synthetic visualization in normalized coordinates | Rendering helpers used by the [example notebook](../examples/dartboard_visualization.ipynb); not the detector's metric model |
-| [recognition notebook](../examples/dart_recognition.ipynb) | Staged single-image workflow: board detection, rectification, recognition result contracts, scoring, annotation | Calls `detect_board()`, overlays, and `score_from_image_point()`; dart, number, and tip backends are unset slots, so those stages report `not configured` |
+| [recognition](../src/dartcv/recognition.py) | Recognition data contracts, output validation, backend execution, expected-sector comparison | `DartBox`, `NumberReading`, `DartTip`, `StageResult`, `run_stage()`, validators, `expected_sector()`; no bundled inference backend |
+| [recognition overlay](../src/dartcv/recognition_overlay.py) | Draw observed boxes, text, tips, and optional scores without mutating the source | `annotate()`; consumes recognition records, uses OpenCV |
+| [dart detection](../src/dartcv/dart_detection.py) | Optional local pretrained, text-guided whole-dart box experiment | `Owlv2DartDetector(image)` returns `DartBox` records; lazy PyTorch/Transformers loading, processor coordinate restoration, OpenCV NMS |
+| [classical darts](../src/dartcv/classical_darts.py) | Calibrated, single-dart flight/shaft hypothesis generation, conservative acceptance and diagnostics | `ClassicalDartDetector(H)(image)` returns zero/one `DartBox`; `diagnostic_views()`; NumPy/OpenCV only |
+| [recognition notebook](../examples/dart_recognition.ipynb) | Staged single-image orchestration, configuration, plotting, scoring, optional export | Defaults to classical boxes with session reuse keyed by settings/calibration; OWLv2 remains an optional library alternative; number and tip slots remain unset |
 
 ## Runtime and data flow
 
@@ -59,6 +63,11 @@ Library detection returns data without writing files. See the
   code transforms these for top-down rendering; absent contours remain nominal.
 - Scoring uses nominal `RADII`, not the fitted paint contours. The normalized
   synthetic renderer is not a replacement for the millimetre geometry model.
+- Recognition backends return original-image coordinates and confidence in [0, 1].
+  `run_stage()` distinguishes missing, failed, and successful-empty results;
+  exceptions or validation failures discard all items from that stage. Box IDs
+  must be unique; associated tips must refer to a known nearby box. A box centre
+  is never substituted for a tip, and expected sector labels never replace OCR.
 - Supplied calibration points must be the outer-double intersections at
   `20|1`, `6|10`, `3|19`, `11|14`, in that order.
 
@@ -82,6 +91,17 @@ SciPy supports robust ring optimization; Matplotlib supports synthetic rendering
 DVC with Google Drive support manages the image dataset; its authentication
 dependencies are not part of the detection algorithm.
 
+The `dart-detection` extra adds PyTorch, Torchvision, Transformers, and Pillow.
+The optional adapter is independent of board calibration and preserves original
+perspective. Its first inference loads pinned external weights into a local
+Hugging Face cache; imports and synthetic tests never fetch weights. Images stay
+local. Core board commands do not require these dependencies.
+
+The classical detector needs no additional dependencies. It consumes the board
+homography as a search/paint prior, never as a warp of the dart. Its last-attempt
+diagnostics store working-resolution arrays with an explicit source scale;
+returned boxes use original pixels. It has no file-writing or scoring side effects.
+
 Image contents are managed as one DVC dataset, referenced by
 [data/images.dvc](../data/images.dvc). Output images are generated artifacts,
 not input data. Credentials stay local and must not enter documentation or Git.
@@ -93,6 +113,10 @@ See the [README data workflow](../README.md#pictures-on-google-drive-uv--dvc).
   scoring, detection, CLI outputs, diagnostics, and bull constraints.
 - [Ring tests](../tests/test_rings.py) cover colour-band fitting, refinement,
   occlusion/fallback behavior, and overlay integration.
+- [Recognition tests](../tests/test_recognition.py) cover backend states, output
+  validation, tip associations, sector comparison, and non-mutating annotation.
+- [Classical dart tests](../tests/test_classical_darts.py) cover synthetic flights,
+  shafts, paint rejection, ambiguity, hue wrapping and coordinate restoration.
 - Run `uv run --group dev pytest`; use one explicitly selected real image for a
   visual check unless a batch evaluation is requested.
 - Synthetic tests and diagnostic fit residuals do not establish real-dataset

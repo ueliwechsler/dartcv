@@ -1,5 +1,11 @@
 # Repository instructions
 
+## Git workflow
+
+- Do not create commits or push changes unless the user explicitly requests it.
+- Do not automatically suggest or ask to create a commit after completing a task.
+- Leave completed changes uncommitted by default.
+
 ## Documentation
 
 For every code change, assess documentation impact and update affected docs and
