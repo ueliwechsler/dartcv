@@ -155,6 +155,18 @@ def test_optional_manual_score_defaults_and_old_labels_remain_readable():
             parse_annotation(data)
 
 
+def test_approximate_tip_round_trip_and_required_coordinates():
+    data = labels()
+    data["darts"][0]["tip_status"] = "approximate"
+    annotation = parse_annotation(data)
+    assert annotation.darts[0].tip == (29, 13)
+    assert annotation.darts[0].tip_status == "approximate"
+    assert parse_annotation(annotation.to_dict()) == annotation
+    data["darts"][0]["tip"] = None
+    with pytest.raises(ValueError, match="xy pairs"):
+        parse_annotation(data)
+
+
 @pytest.mark.parametrize("status", ["completed", "draft", "missing"])
 def test_comparison_notebook_consumes_saved_labels(tmp_path, capsys, status):
     root = Path(__file__).resolve().parents[1]
@@ -235,5 +247,22 @@ assert.deepEqual(E.intersections([[0,0],[10,0],[10,10],[0,10]]), []);
 assert.ok(E.intersections([[0,0],[10,0],[10,10],[0,0],[-10,10],[-10,0]]).some(p => p[0] === 0 && p[1] === 0));
 assert.ok(E.intersections([[0,0],[10,0],[5,0],[5,10]]).some(p => p[0] === 5 && p[1] === 0));
 assert.ok(E.intersections([[0,0],[0,0],[10,0],[10,10]]).some(p => p[0] === 0 && p[1] === 0));
+const approximate = new E.History(initial);
+const placed = E.clone(approximate.document);
+E.setTip(placed.darts[0], [25,12], 'approximate');
+approximate.commit(placed);
+assert.equal(approximate.document.darts[0].tip_status, 'approximate');
+const moved = E.clone(approximate.document);
+E.setTip(moved.darts[0], [26,13], moved.darts[0].tip_status);
+approximate.commit(moved);
+assert.equal(approximate.document.darts[0].tip_status, 'approximate');
+approximate.undo();
+assert.deepEqual(approximate.document.darts[0].tip, [25,12]);
+approximate.undo();
+assert.equal(approximate.document.darts[0].tip_status, 'exact');
+approximate.redo();
+assert.equal(approximate.document.darts[0].tip_status, 'approximate');
+E.setTip(placed.darts[0], null);
+assert.equal(placed.darts[0].tip_status, 'unknown');
 """, str(editor), json.dumps(labels())], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr

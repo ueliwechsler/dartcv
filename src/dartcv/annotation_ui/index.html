@@ -31,7 +31,7 @@
         <option value="unknown">Unknown</option><option value="embedded">Embedded</option><option value="not_embedded">Not embedded</option>
       </select></label>
       <div id="tip-status"></div>
-      <div><button id="tip">Place exact tip</button> <button id="unknown-tip">Hidden / unknown</button></div>
+      <div><button id="tip">Place exact tip</button> <button id="approximate-tip">Place approximate tip</button> <button id="unknown-tip">Hidden / unknown (no point)</button></div>
       <label>Optional score <select id="score-number" aria-label="Score number"></select></label>
       <label>Scoring ring <select id="score-multiplier">
         <option value="single">Single (default)</option>
@@ -59,7 +59,7 @@
       <div><button id="fit">Fit image</button> <button id="zoom-in">Zoom +</button> <button id="zoom-out">Zoom -</button></div>
       <label><input id="show-inferred" type="checkbox" checked> Show inferred silhouettes</label>
       <p>Wheel to zoom. Space + drag (or middle button) to pan. Draw by clicking vertices; Enter closes. In edit mode drag a selected polygon's vertices. Right-click a vertex to remove it; double-click an edge to add one.</p>
-      <p>Tip means the physical point, not an image-edge crossing. Exact = a visible clicked point; hidden/unknown = no guess. Board contact is separate.</p>
+      <p>Tip means the physical point, not an image-edge crossing. Exact = visible endpoint; approximate = estimated position; hidden/unknown = no point. Board contact is separate.</p>
       <p>Trace only visible pixels in part polygons. Use separate polygons for disconnected pieces of one dart. Inferred silhouettes never count as segmentation truth. All other pixels on a completed photo are background except ignore regions.</p>
       <p>Originals stay untouched; all coordinates are in original-resolution OpenCV-decoded photo pixels. No images leave this machine.</p>
     </aside>

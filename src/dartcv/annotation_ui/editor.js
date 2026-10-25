@@ -60,8 +60,9 @@
     if (region.kind === "ignore") document.ignore.splice(region.index, 1);
     else document.darts[dartIndex][region.kind === "visible" ? "visible" : "silhouette"].splice(region.index, 1);
   }
-  function setTip(dart, point) {
-    dart.tip_status = point === null ? "unknown" : "exact";
+  function setTip(dart, point, status = "exact") {
+    if (!["exact", "approximate"].includes(status)) throw new Error("A placed tip must be exact or approximate.");
+    dart.tip_status = point === null ? "unknown" : status;
     dart.tip = point === null ? null : clone(point);
   }
   function setScore(dart, number, multiplier = "single") {

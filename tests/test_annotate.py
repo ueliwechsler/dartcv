@@ -35,11 +35,15 @@ def completed(store):
 def test_atomic_resume_and_concurrent_save_conflicts(store):
     annotation = completed(store)
     annotation["darts"][0]["score"] = {"number": 20, "multiplier": "triple"}
+    annotation["darts"][0]["tip_status"] = "approximate"
+    annotation["darts"][0]["tip"] = [9, 2]
     original = (store.image_dir / "one.jpg").read_bytes()
     saved = store.save("one.jpg", annotation, None)
     assert store.load("one.jpg") == {"annotation": json.loads(json.dumps(annotation)), "revision": saved["revision"]}
     assert store.listing()[0] == {"name": "one.jpg", "status": "completed"}
     assert store.load("one.jpg")["annotation"]["darts"][0]["score"] == {"number": 20, "multiplier": "triple"}
+    assert store.load("one.jpg")["annotation"]["darts"][0]["tip_status"] == "approximate"
+    assert store.load("one.jpg")["annotation"]["darts"][0]["tip"] == [9, 2]
     with pytest.raises(SaveConflict, match="another tab"):
         store.save("one.jpg", annotation, None)
     edited = deepcopy(annotation)

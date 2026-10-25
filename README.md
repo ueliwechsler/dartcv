@@ -90,7 +90,7 @@ Optional batch/ablation switches remain off in this smoke check.
 Run `uv run python -m dartcv.annotate` and open `http://127.0.0.1:8765`.
 Choose an image folder, then a photograph, then a dart. The local browser
 editor supports zoom/pan, per-dart editable polygons,
-flight/shaft labels, optional inferred outlines, exact/unknown tips, ignore
+flight/shaft labels, optional inferred outlines, exact/approximate/unknown tips, ignore
 regions, optional manual sector/ring scores (single by default), contextual
 hover help, undo/redo, and save/resume. Images stay local and unchanged.
 

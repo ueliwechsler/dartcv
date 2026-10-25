@@ -7,7 +7,7 @@
     history: null, saved: "", revision: null, token: null, photos: [], index: -1,
     dart: 0, region: -1, image: null, scale: 1, x: 0, y: 0,
     mode: "edit", pending: [], layer: null, pendingDart: null,
-    drag: null, space: false, busy: false, folder: "."
+    drag: null, space: false, busy: false, folder: ".", tipStatus: "exact"
   };
   const colors = {
     flight: "#53cfff", shaft_barrel: "#ffbd59", uncertain: "#7bf586",
@@ -69,7 +69,7 @@
       ? `Manual label: ${score.number * {single: 1, double: 2, triple: 3}[score.multiplier]} points`
       : "Score not labeled (optional).";
     $("tip-status").textContent = !dart ? "No dart selected." : (
-      dart.tip_status === "exact" ? `Exact tip: ${dart.tip.map(n => n.toFixed(1)).join(", ")}` : "Tip: hidden / unknown"
+      dart.tip ? `${dart.tip_status === "approximate" ? "Approximate" : "Exact"} tip: ${dart.tip.map(n => n.toFixed(1)).join(", ")}` : "Tip: hidden / unknown"
     );
     $("regions").replaceChildren(...regions().map((region, index) =>
       option(index, `${region.kind === "visible" ? "Visible " : ""}${region.part} #${region.index + 1}`)));
@@ -77,7 +77,7 @@
     $("regions").value = state.region;
     $("undo").disabled = !state.history.past.length && !state.pending.length;
     $("redo").disabled = !state.history.future.length || state.pending.length > 0;
-    for (const id of ["tip", "unknown-tip", "remove-dart"]) $(id).disabled = !dart;
+    for (const id of ["tip", "approximate-tip", "unknown-tip", "remove-dart"]) $(id).disabled = !dart;
     $("copy").disabled = !selected() || selected().kind !== "visible";
     $("delete").disabled = !selected();
     $("finish").disabled = state.mode !== "draw";
@@ -213,8 +213,14 @@
         ctx.lineWidth = 2 / state.scale;
         ctx.beginPath(); ctx.moveTo(x - radius, y); ctx.lineTo(x + radius, y);
         ctx.moveTo(x, y - radius); ctx.lineTo(x, y + radius); ctx.stroke();
+        if (dart.tip_status === "approximate") {
+          ctx.setLineDash([4 / state.scale, 3 / state.scale]);
+          ctx.beginPath(); ctx.arc(x, y, radius * 1.5, 0, 2 * Math.PI); ctx.stroke();
+          ctx.setLineDash([]);
+        }
         ctx.font = `${13 / state.scale}px system-ui`;
-        ctx.fillStyle = ctx.strokeStyle; ctx.fillText(dart.id, x + radius, y - radius);
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fillText(dart.id + (dart.tip_status === "approximate" ? " (approx.)" : ""), x + radius, y - radius);
       }
     });
     doc().ignore.forEach((points, index) => polygon(
@@ -249,8 +255,8 @@
         state.pending.push(point); refresh(); return;
       }
       if (state.mode === "tip") {
-        mutate(next => E.setTip(next.darts[state.dart], point));
-        state.mode = "edit"; message("Exact tip placed. Set board contact separately."); return;
+        mutate(next => E.setTip(next.darts[state.dart], point, state.tipStatus));
+        state.mode = "edit"; message(`${state.tipStatus === "approximate" ? "Approximate" : "Exact"} tip placed. Set board contact separately.`); return;
       }
       const region = selected();
       const vertex = region ? nearestVertex(region.points, point) : -1;
@@ -280,7 +286,7 @@
     }
     const point = source(cursor(event), true);
     if (state.drag.kind === "vertex") E.polygonPoints(doc(), state.dart, state.drag.region)[state.drag.vertex] = point;
-    else E.setTip(activeDart(), point);
+    else E.setTip(activeDart(), point, activeDart().tip_status);
     render();
   });
   function endDrag(cancel = false) {
@@ -356,7 +362,11 @@
   bind("finish", finish);
   bind("cancel", () => { cancelMode(); message("Drawing canceled; existing polygons are unchanged."); });
   bind("tip", () => {
-    requireNoDrawing(); state.mode = "tip"; message("Click the physical tip. Pan/zoom first if needed.");
+    requireNoDrawing(); state.mode = "tip"; state.tipStatus = "exact"; message("Click the exact physical tip. Pan/zoom first if needed.");
+  });
+  bind("approximate-tip", () => {
+    requireNoDrawing(); state.mode = "tip"; state.tipStatus = "approximate";
+    message("Click the estimated tip position. It will be saved as approximate, not exact.");
   });
   bind("unknown-tip", () => { requireNoDrawing(); state.mode = "edit"; mutate(next => E.setTip(next.darts[state.dart], null)); });
   bind("add-dart", () => {
@@ -483,7 +493,8 @@
     "remove-dart": "Remove this dart and all its labels. Undo restores it.",
     contact: "Embedded means the tip enters the board. Not embedded is a loose/missed dart. Choose unknown if unclear.",
     tip: "Click the exact physical endpoint/contact location. Include visible metal tip pixels in the shaft/barrel polygon too.",
-    "unknown-tip": "No tip coordinate is saved. Use when the tip is hidden or cannot be identified; never guess.",
+    "approximate-tip": "Click an estimated tip position when the exact endpoint is hidden or unclear. Saved separately as approximate; dragging keeps that status. The dashed circle is a marker, not an uncertainty radius.",
+    "unknown-tip": "Clear the tip coordinate when no position can be given. Use Place approximate tip if you can estimate its location.",
     "score-number": "Optional human-labeled sector number, not total points. Leave unknown when unsure. Use 0 for a miss or 25 for bull.",
     "score-multiplier": "Single is default. Double multiplies by 2; triple by 3. Bull: single 25 or double 50. Score is not inferred from the tip.",
     layer: "Visible flight: fins. Shaft/barrel: body, shaft and visible metal tip. Uncertain part: definitely dart, part unclear. Inferred silhouette: includes hidden shape, not ground truth. Ignore: dart/background truly ambiguous.",

@@ -42,7 +42,7 @@ class AnnotatedDart:
     id: str
     visible: tuple[VisibleRegion, ...]
     silhouette: tuple[Polygon, ...]
-    tip_status: Literal["exact", "unknown"]
+    tip_status: Literal["exact", "approximate", "unknown"]
     tip: Point | None
     contact: Literal["embedded", "not_embedded", "unknown"]
     score: AnnotatedScore | None = None
@@ -164,9 +164,9 @@ def parse_annotation(data: object) -> ImageAnnotation:
         if data["status"] == "completed" and not visible:
             raise ValueError(f"Completed dart {dart_id} needs at least one visible region.")
         tip_status = item["tip_status"]
-        if tip_status not in ("exact", "unknown"):
-            raise ValueError("Tip status must be exact or unknown.")
-        tip = point(item["tip"]) if tip_status == "exact" else None
+        if tip_status not in ("exact", "approximate", "unknown"):
+            raise ValueError("Tip status must be exact, approximate or unknown.")
+        tip = point(item["tip"]) if tip_status != "unknown" else None
         if tip_status == "unknown" and item["tip"] is not None:
             raise ValueError("An unknown tip must have null coordinates.")
         if item["contact"] not in ("embedded", "not_embedded", "unknown"):

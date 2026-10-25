@@ -734,6 +734,13 @@ a per-selected-dart polygon summary, without blocking saves. Collinear edge
 overlaps mark their endpoints; intersections between distinct polygons are not
 warnings.
 
+Tip annotations additionally allow `approximate` with source coordinates for a
+hidden/unclear but estimated endpoint. A separate placement button and dashed
+circle distinguish it from `exact`; dragging preserves its status, and unknown
+still means null coordinates. The circle is not an uncertainty bound. Visible-mask
+evaluation ignores all tip labels; future localization metrics must distinguish
+approximate labels from exact ground truth. Older exact/unknown files stay valid.
+
 Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
 part; optional complete inferred silhouettes are separate. A physical tip is
 exact or hidden/unknown; embedded/not-embedded/unknown contact determines

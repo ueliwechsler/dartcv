@@ -46,8 +46,11 @@ uv run python -m dartcv.annotate --images data/images/multi_dart \
 3. Optionally draw a **complete inferred silhouette**, or copy a visible polygon
    and edit that copy. This is a separate hypothesis about the full dart shape;
    it never replaces visible labels or contributes to segmentation truth.
-4. Click **Place exact tip**, then the physical dart point. Mark hidden/unknown
-   when it cannot be seen, without guessing its location. Set contact to
+4. Click **Place exact tip**, then the physical dart point. Use **Place
+   approximate tip** to record an estimated position when the endpoint is
+   hidden or unclear, or **Hidden / unknown (no point)** to leave it unlocated.
+   Approximate points have a dashed-circle marker and remain approximate when
+   dragged; the circle is not a measured uncertainty radius. Set contact to
    **embedded**, **not embedded**, or **unknown**. A physical tip is a board
    entry point only when embedded. A dart outside the scoring area is still
    annotated; a dart entirely outside the photo is not.
@@ -63,8 +66,8 @@ uv run python -m dartcv.annotate --images data/images/multi_dart \
    the visible `uncertain` category, not ignore. Do not label shadows or board
    reflections as dart.
 6. Review all visible darts, including off-board parts. Set the photo to
-   **Completed** only when every visible dart has visible regions and an exact
-   or explicitly unknown tip. Pixels outside visible and ignore regions become
+   **Completed** only when every visible dart has visible regions and an exact,
+   approximate or explicitly unknown tip. Pixels outside visible and ignore regions become
    background truth. **Save** or **Save & Next**; unfinished work stays Draft.
    A completed photo with zero darts is valid only if no dart is visible.
 
@@ -105,7 +108,7 @@ extension to avoid collisions. `schema_version: 1` contains:
 | `darts[].id` | Unique per-photo dart identity |
 | `darts[].visible[]` | `part` (`flight`, `shaft_barrel`, `uncertain`) and polygon `points` |
 | `darts[].silhouette[]` | Optional complete inferred polygons, distinct from observations |
-| `darts[].tip_status`, `tip` | `exact` with `[x,y]`, or `unknown` with `null` |
+| `darts[].tip_status`, `tip` | `exact` or `approximate` with `[x,y]`, or `unknown` with `null` |
 | `darts[].contact` | `embedded`, `not_embedded`, `unknown` |
 | `darts[].score` | Optional `null` or `{number, multiplier}`; number 0, 1-20, or 25; multiplier `single` (default), `double`, `triple` |
 | `ignore[]` | Ambiguous polygons excluded from visible-mask evaluation |
@@ -170,4 +173,6 @@ These are binary visible-region metrics, not per-dart instance accuracy,
 entry-point error, scores, or a generalization claim. Inferred silhouettes,
 contact status and tip labels are deliberately not used to score segmentation.
 Future tip localization can consume exact labels, distinguishing embedded entry
-points from nonembedded tips and excluding unknown points.
+points from nonembedded tips and excluding unknown points. Approximate points
+must remain separate from exact ground truth rather than silently entering
+exact-localization error metrics.
