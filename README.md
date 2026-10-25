@@ -71,6 +71,49 @@ supplied intersections. These modes write the three standard images and
 not generated. Use a fresh output directory when comparing different modes to
 avoid confusing older images with a new run.
 
+## Dart scoring notebook
+
+[examples/dart_scorer_pipeline.ipynb](examples/dart_scorer_pipeline.ipynb) stages the
+scoring logic from model-space checks to image-space homography scoring and a
+final end-to-end board run. The notebook validates the standard radius/sector rules,
+confirms the homography round-trip on synthetic calibration points, and shows how
+`detect_board()` feeds the same score helpers used in the live pipeline.
+
+## Multi-dart board inspection
+
+Open [examples/color_dart_board_inspection.ipynb](examples/color_dart_board_inspection.ipynb)
+in VS Code with the project's Python environment (`uv sync --group dev`).
+Run the cells, choose `IMAGE_INDEX` from `data/images/multi_dart`, and rerun from
+**Run preparation** to switch photos. The notebook shows source/normalized views,
+nominal ring/spoke overlays, color and board masks, detector artifacts, and
+per-stage timings; an opt-in cell compares normalization resolutions.
+
+The notebook uses `prepare_board(image, diagnostics=True)`, also available as a
+library function without constructing unfinished recognition stages. Expected
+failures remain visible with partial diagnostics. Plotting returns a Matplotlib
+figure without automatically showing or saving it.
+
+This is board preparation only: overlays are nominal geometry, not detected
+physical wires or confirmed numbered sectors. The normalized view excludes the
+outer printed-number ring by default. Full-resolution diagnostic snapshots are
+opt-in and memory-heavy.
+
+For milestone 3, open
+[examples/color_dart_orientation_inspection.ipynb](examples/color_dart_orientation_inspection.ipynb).
+It requests an optional wider view with source-coverage mask, extracts an explicit
+`20` template from a manually identified reference, and inspects the number strip,
+candidate matches, confidence and internal timings on another photo. The original
+board-inspection notebook and scoring-view transforms are unchanged.
+
+`Printed20OrientationStage(template)` is an injectable, local OpenCV matcher,
+not general OCR. Use `partial(normalize_board_view, number_ring_radius_mm=240.0)`
+as the normalizer to supply its input. Its clockwise correction is relative to
+the rectified model; uncertain guesses remain explicit and absent evidence fails.
+The template, annular radii and thresholds are provisional and board-style
+dependent. The tiny [annotation manifest](data/annotations/color_dart_orientation.json)
+is for inspected same-board examples, not a dataset accuracy claim. Dart
+segmentation, entry-point localization and new scoring are still unimplemented.
+
 ## Dart recognition notebook
 
 [examples/dart_recognition.ipynb](examples/dart_recognition.ipynb) walks one image
@@ -221,4 +264,3 @@ uv run dvc status -c
 These checks serve different purposes: a synchronized remote cache does not
 mean unrecorded local image changes have been uploaded. For those changes,
 repeat the add, DVC push, Git commit, and Git push workflow above.
-

@@ -286,6 +286,16 @@ are bundled. The optional adapter fetches external pretrained weights explicitly
 on first inference. OCR and automatic orientation correction can follow once tip
 detection is evaluated.
 
+## Standalone Canny edge helper
+
+[`canny_edges()`](../src/dartcv/edge_detection.py) is a general-purpose image
+utility and is not part of `detect_board()` or the automatic board pipeline. It
+accepts grayscale or BGR `uint8` images, converts BGR to grayscale, applies a
+Gaussian blur, and returns a single-channel Canny edge map. The lower and upper
+hysteresis thresholds, odd-sized blur kernel, and Gaussian sigma are configurable;
+sigma zero lets OpenCV derive the blur from the kernel. The helper does not
+combine per-color-channel edge maps or estimate board geometry.
+
 ## Validation, failure modes, and maintenance
 
 The [homography tests](../tests/test_homography.py) and
