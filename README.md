@@ -71,6 +71,20 @@ supplied intersections. These modes write the three standard images and
 not generated. Use a fresh output directory when comparing different modes to
 avoid confusing older images with a new run.
 
+## Running notebooks after code changes
+
+Select the repository's `.venv` Python kernel (`uv sync --group dev`). After
+updating code, **Restart Kernel**, then **Run All**. Existing imports and analysis
+objects can otherwise retain the previous API, causing errors such as missing
+`ColorAssignment` or `color_model_names`. All notebooks enable autoreload for
+subsequent edits, but analysis cells still need rerunning; structural changes to
+classes/dataclasses require a restart.
+
+`uv run --group dev pytest -q tests/test_notebooks.py` executes every notebook's
+default cells in fresh IPython sessions, with outputs isolated in temporary
+directories. Image notebooks are skipped if local DVC photographs are absent.
+Optional batch/ablation switches remain off in this smoke check.
+
 ## Dart scoring notebook
 
 [examples/dart_scorer_pipeline.ipynb](examples/dart_scorer_pipeline.ipynb) stages the

@@ -663,6 +663,31 @@ Benchmark stage execution with diagnostics off and repeated representative
 inputs before choosing a latency target. Compare geometric quality as well as
 runtime; fast, successful execution is not sufficient evidence of correctness.
 
+### Notebook compatibility follow-up (2026-10-25)
+
+Saved `color_model_names` and `ColorAssignment` failures were reproduced by
+retaining the previous segmentation module/result in a live notebook kernel;
+the five color notebooks ran successfully with the current code in fresh
+kernels. All notebooks now enable IPython autoreload and explain the required
+**Restart Kernel / Run All** after API or dataclass changes. Autoreload is not
+a migration of old results: the segmentation display cells explicitly reject
+old diagnostic schemas with recomputation instructions instead of a `KeyError`.
+The four number-ring notebooks resolve the repository source path before
+importing `dartcv`, consistently from the root or `examples` directory.
+
+Fresh-kernel execution also exposed an older scoring notebook's import of
+`dart_scorer.polar(x, y)` where its examples require
+`geometry.polar(radius_mm, angle_deg)`. Only the notebook import was corrected;
+neither scorer's coordinate convention was changed.
+
+`tests/test_notebooks.py` now exercises all 12 notebooks' default cells in fresh
+IPython subprocesses, starting in an isolated `examples` directory with local
+data/source links. Generated output stays in temporary directories, and missing
+DVC photographs skip image runs. Optional batch/ablation/probe switches are not
+enabled by this smoke check. The same file covers the scoring example assertions
+and explicit stale-analysis rejection without requiring photographs.
+The targeted suite passed **15 tests**.
+
 ## Related documentation and maintenance
 
 - [README](../README.md): commands, outputs, setup, and data workflows.
