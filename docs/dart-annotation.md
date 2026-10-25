@@ -88,7 +88,7 @@ dart. No exact-three or on-board-only assumption is made.
   Saving is explicit, not automatic. Resume by reopening the same image folder
   and annotation directory. Download JSON preserves a separate copy but does
   not mark server changes saved.
-- Saves validate finite in-image coordinates, non-self-crossing polygons,
+- Saves validate finite in-image coordinates, at least three non-collinear vertices,
   completion rules and source identity, then replace JSON atomically.
   A revision conflict from another tab is shown explicitly; download your copy
   before reloading. Use one editor server per annotation directory.
@@ -111,9 +111,18 @@ extension to avoid collisions. `schema_version: 1` contains:
 | `ignore[]` | Ambiguous polygons excluded from visible-mask evaluation |
 
 Every polygon is an ordered array of source-photo `[x,y]` vertices, origin at
-top left, x right, y down. Do not repeat the first vertex at the end. Polygons
+top left, x right, y down. There is no need to repeat the first vertex at the end.
+Crossing edges, self-touching outlines and repeated vertices are accepted.
+Overlapping loops within a polygon use even-odd filling in the GUI and masks;
+inspect the filled area to confirm it represents the intended region. Polygons
 have no holes; use multiple polygons for disconnected parts. Regions are
 combined by union, not by winding direction. Ignore regions take precedence.
+Yellow circles mark self-crossings, touches, repeated vertices and endpoints of
+overlapping edges. The polygon list's warning summary identifies affected
+regions for the selected dart and shared ignore regions. These are informational:
+you can save without fixing them. Toggle **Mark crossings / touches** to hide
+the markers. Separate polygons may overlap without a warning; this is normal
+for different parts or inferred silhouettes.
 The displayed full-resolution JPEG is decoded and re-encoded using OpenCV,
 matching the pipeline's EXIF orientation handling rather than a browser-specific
 image orientation. Source files are never modified. The SHA-256 is checked on

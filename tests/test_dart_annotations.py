@@ -55,7 +55,7 @@ def test_round_trip_and_invalid_completed_or_unknown_labels():
         (lambda d: d.update(image="../photo.jpg"), "filename"),
         (lambda d: d["darts"].append(deepcopy(d["darts"][0])), "unique"),
         (lambda d: d.update(schema_version=2), "schema_version"),
-        (lambda d: d["darts"][0]["visible"][0].update(points=[[0, 0], [20, 20], [0, 20], [10, 0]]), "cross"),
+        (lambda d: d["darts"][0]["visible"][0].update(points=[[0, 0], [10, 10], [20, 20]]), "non-collinear"),
     ]:
         invalid = deepcopy(data)
         change(invalid)
@@ -64,6 +64,21 @@ def test_round_trip_and_invalid_completed_or_unknown_labels():
     data["status"] = "draft"
     data["darts"][0].update(visible=[], tip_status="unknown", tip=None)
     assert parse_annotation(data).darts[0].tip is None
+
+
+@pytest.mark.parametrize("points", [
+    [[10, 10], [30, 30], [10, 30], [30, 10]],
+    [[10, 10], [20, 10], [20, 20], [10, 10], [5, 20], [5, 10]],
+    [[10, 10], [10, 10], [30, 10], [30, 30], [10, 30], [10, 10]],
+])
+def test_crossing_touching_and_repeated_vertices_save_and_evaluate(points):
+    data = labels()
+    data["darts"][0]["visible"] = [{"part": "flight", "points": points}]
+    annotation = parse_annotation(data)
+    assert parse_annotation(annotation.to_dict()) == annotation
+    result = evaluate_visible_masks(view(), np.ones((100, 100), np.float32), annotation)
+    assert result.metrics.true_positive > 0
+    assert result.metrics.recall == 1.0
 
 
 def test_visible_evaluation_ignores_inferred_shapes_and_ambiguous_pixels():
@@ -215,5 +230,10 @@ assert.equal(changed.darts[0].visible.length, 1);
 assert.equal(changed.darts[0].silhouette.length, 2);
 assert.equal(E.completeErrors(initial).length, 0);
 assert.equal(E.nearestEdge(points, [5,1]).index, 0);
+assert.deepEqual(E.intersections([[0,0],[10,10],[0,10],[10,0]]), [[5,5]]);
+assert.deepEqual(E.intersections([[0,0],[10,0],[10,10],[0,10]]), []);
+assert.ok(E.intersections([[0,0],[10,0],[10,10],[0,0],[-10,10],[-10,0]]).some(p => p[0] === 0 && p[1] === 0));
+assert.ok(E.intersections([[0,0],[10,0],[5,0],[5,10]]).some(p => p[0] === 5 && p[1] === 0));
+assert.ok(E.intersections([[0,0],[0,0],[10,0],[10,10]]).some(p => p[0] === 0 && p[1] === 0));
 """, str(editor), json.dumps(labels())], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr

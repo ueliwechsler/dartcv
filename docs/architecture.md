@@ -724,6 +724,16 @@ avoid same-filename collisions. Supplying a single photo folder via `--images`
 keeps the original flat-output behavior. Arbitrary browser-supplied paths are
 not accepted.
 
+Polygon validation permits crossing/self-touching edges and repeated vertices,
+including bow-tie shapes whose signed contour area cancels to zero. It still
+requires finite in-image coordinates and three non-collinear vertices. Browser
+fill/hit testing uses even-odd semantics to match OpenCV mask rasterization;
+separate region polygons remain unioned.
+The editor marks self-intersections/touches with optional yellow circles and
+a per-selected-dart polygon summary, without blocking saves. Collinear edge
+overlaps mark their endpoints; intersections between distinct polygons are not
+warnings.
+
 Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
 part; optional complete inferred silhouettes are separate. A physical tip is
 exact or hidden/unknown; embedded/not-embedded/unknown contact determines

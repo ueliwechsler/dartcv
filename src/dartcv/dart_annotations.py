@@ -130,29 +130,9 @@ def parse_annotation(data: object) -> ImageAnnotation:
         if not isinstance(value, (list, tuple)) or len(value) < 3:
             raise ValueError("A polygon needs at least three vertices.")
         vertices = tuple(point(p) for p in value)
-        contour = np.asarray(vertices, np.float32)
-        if abs(cv2.contourArea(contour)) < 0.5:
-            raise ValueError("A polygon must enclose nonzero area.")
-        # Crossing outlines have ambiguous visible/background semantics.
-        for i in range(len(vertices)):
-            a, b = contour[i], contour[(i + 1) % len(vertices)]
-            if np.linalg.norm(a - b) < 1e-6:
-                raise ValueError("Polygon vertices must be distinct along each edge.")
-            for j in range(i + 1, len(vertices)):
-                if j == i + 1 or (i == 0 and j == len(vertices) - 1):
-                    continue
-                c, d = contour[j], contour[(j + 1) % len(vertices)]
-
-                def cross(u, v):
-                    return float(u[0] * v[1] - u[1] * v[0])
-
-                ab_c, ab_d = cross(b - a, c - a), cross(b - a, d - a)
-                cd_a, cd_b = cross(d - c, a - c), cross(d - c, b - c)
-                if ab_c * ab_d <= 0 and cd_a * cd_b <= 0 and (
-                    np.maximum(np.minimum(a, b), np.minimum(c, d))
-                    <= np.minimum(np.maximum(a, b), np.maximum(c, d))
-                ).all():
-                    raise ValueError("Polygon edges must not cross or touch themselves.")
+        contour = np.asarray(vertices, np.float64)
+        if np.linalg.matrix_rank(contour - contour[0]) < 2:
+            raise ValueError("A polygon needs at least three non-collinear vertices.")
         return vertices
 
     def polygons(value: object) -> tuple[Polygon, ...]:

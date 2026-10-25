@@ -81,6 +81,13 @@
     $("copy").disabled = !selected() || selected().kind !== "visible";
     $("delete").disabled = !selected();
     $("finish").disabled = state.mode !== "draw";
+    const warnings = regions().map((region, index) => {
+      const count = E.intersections(region.points).length;
+      return count ? `${index + 1}: ${region.part} (${count} marked locations)` : null;
+    }).filter(Boolean);
+    $("polygon-warnings").textContent = warnings.length
+      ? `Allowed crossings/touches — polygon ${warnings.join("; ")}. Saving is not blocked.`
+      : "No crossings/touches in this dart's polygons or ignore regions.";
     render();
   }
   function cancelMode() {
@@ -159,7 +166,7 @@
     if (!points.length) return;
     path(points);
     ctx.fillStyle = color + (inferred ? "12" : "30");
-    ctx.fill();
+    ctx.fill("evenodd");
     ctx.strokeStyle = color;
     ctx.lineWidth = (highlighted ? 3 : 1.5) / state.scale;
     ctx.setLineDash(inferred ? [8 / state.scale, 5 / state.scale] : []);
@@ -169,6 +176,15 @@
       for (const point of points) {
         ctx.beginPath(); ctx.arc(...point, 4 / state.scale, 0, 2 * Math.PI);
         ctx.fillStyle = color; ctx.fill();
+      }
+    }
+    if ($("show-crossings").checked) {
+      ctx.strokeStyle = "#ffff00";
+      ctx.lineWidth = 2 / state.scale;
+      for (const point of E.intersections(points)) {
+        ctx.beginPath();
+        ctx.arc(...point, 8 / state.scale, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
   }
@@ -247,7 +263,7 @@
           path(region.points);
           return ctx.isPointInPath(
             (screen[0]) * (window.devicePixelRatio || 1),
-            (screen[1]) * (window.devicePixelRatio || 1)
+            (screen[1]) * (window.devicePixelRatio || 1), "evenodd"
           );
         });
         state.region = hit; refresh(); return;
@@ -308,7 +324,7 @@
     cancelMode();
     state.region = regions().findLastIndex(region => region.kind === kind);
     refresh();
-    message("Polygon added. Select its entry to edit vertices. Save reports invalid/self-crossing outlines.");
+    message("Polygon added. Select its entry to edit vertices. Crossing and self-touching edges are allowed.");
   }
   async function save(next = false) {
     requireNoDrawing();
@@ -438,6 +454,7 @@
     mutate(next => { next.status = value; });
   }));
   $("show-inferred").addEventListener("change", render);
+  $("show-crossings").addEventListener("change", render);
   window.addEventListener("keydown", run(event => {
     if (!state.history || ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(document.activeElement.tagName)) return;
     if (event.code === "Space") { state.space = true; event.preventDefault(); }
@@ -471,7 +488,7 @@
     "score-multiplier": "Single is default. Double multiplies by 2; triple by 3. Bull: single 25 or double 50. Score is not inferred from the tip.",
     layer: "Visible flight: fins. Shaft/barrel: body, shaft and visible metal tip. Uncertain part: definitely dart, part unclear. Inferred silhouette: includes hidden shape, not ground truth. Ignore: dart/background truly ambiguous.",
     draw: "Click boundary vertices in order, then Enter or Finish. Separate disconnected visible pieces into multiple polygons.",
-    finish: "Close the polygon with at least three vertices. Self-crossing outlines are rejected on save.",
+    finish: "Close the polygon with at least three non-collinear vertices. Crossing and self-touching edges are allowed; overlapping loops use even-odd filling.",
     cancel: "Discard only the unfinished polygon; saved regions remain unchanged.",
     regions: "Select a polygon to edit. Drag vertices, double-click an edge to insert, right-click a vertex to remove.",
     copy: "Create an independent inferred silhouette from the selected visible region. Editing it leaves visible ground truth unchanged.",
@@ -482,6 +499,7 @@
     "zoom-in": "Zoom in around the canvas center. The mouse wheel zooms around the pointer.",
     "zoom-out": "Zoom out. Hold Space and drag or use the middle button to pan.",
     "show-inferred": "Show/hide optional complete inferred silhouettes. They never count as visible segmentation truth.",
+    "show-crossings": "Yellow circles mark self-crossings, touches, repeated vertices, or endpoints of overlapping edges. These are informational and do not prevent saving. Overlaps between separate polygons are allowed without warnings.",
   };
   for (const [id, text] of Object.entries(help)) {
     const control = $(id);

@@ -89,7 +89,44 @@
   function completeErrors(document) {
     return document.darts.flatMap(dart => dart.visible.length ? [] : [`${dart.id} needs a visible region (or remove this dart).`]);
   }
-  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, setScore, nearestEdge, completeErrors};
+  function intersections(points) {
+    const found = [];
+    const epsilon = 1e-7;
+    const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
+    const subtract = (a, b) => [a[0] - b[0], a[1] - b[1]];
+    const add = point => {
+      if (!found.some(p => Math.hypot(p[0] - point[0], p[1] - point[1]) < epsilon)) found.push(point);
+    };
+    const onSegment = (p, a, b) => {
+      const ab = subtract(b, a), ap = subtract(p, a);
+      return Math.abs(cross(ab, ap)) <= epsilon * Math.max(1, Math.hypot(...ab)) &&
+        p[0] >= Math.min(a[0], b[0]) - epsilon && p[0] <= Math.max(a[0], b[0]) + epsilon &&
+        p[1] >= Math.min(a[1], b[1]) - epsilon && p[1] <= Math.max(a[1], b[1]) + epsilon;
+    };
+    for (let i = 0; i < points.length; i++) {
+      const a = points[i], b = points[(i + 1) % points.length], r = subtract(b, a);
+      if (Math.hypot(...r) < epsilon) add(a);
+      for (let j = i + 1; j < points.length; j++) {
+        const c = points[j], d = points[(j + 1) % points.length], s = subtract(d, c);
+        const adjacent = j === i + 1 || (i === 0 && j === points.length - 1);
+        const shared = j === i + 1 ? b : a;
+        const report = point => {
+          if (!adjacent || Math.hypot(point[0] - shared[0], point[1] - shared[1]) > epsilon) add(point);
+        };
+        const denominator = cross(r, s), offset = subtract(c, a);
+        if (Math.abs(denominator) > epsilon) {
+          const t = cross(offset, s) / denominator, u = cross(offset, r) / denominator;
+          if (t >= -epsilon && t <= 1 + epsilon && u >= -epsilon && u <= 1 + epsilon) {
+            report([a[0] + t * r[0], a[1] + t * r[1]]);
+          }
+        } else if (Math.abs(cross(offset, r)) <= epsilon) {
+          for (const p of [a, b, c, d]) if (onSegment(p, a, b) && onSegment(p, c, d)) report(p);
+        }
+      }
+    }
+    return found;
+  }
+  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, setScore, nearestEdge, completeErrors, intersections};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.DartEditor = api;
 })(typeof window === "undefined" ? globalThis : window);
