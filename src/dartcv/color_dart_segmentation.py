@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Callable
+from typing import Callable, Literal
 
 import cv2
 import numpy as np
@@ -31,6 +31,7 @@ class FieldMasks:
     sample_interior: NDArray[np.bool_]
     wire_region: NDArray[np.bool_]
     observed_board: NDArray[np.bool_]
+    pixels_per_mm: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,9 +100,14 @@ def build_field_masks(
     spoke_distance = radius * np.sin(np.deg2rad(9 - offset))
     spoke_distance[radius <= BOARD_RADII_MM["outer_bull"]] = np.inf
     wire_distance = np.minimum(ring_distance, spoke_distance)
+    origin = np.array([[[0., 0.], [1., 0.], [0., 1.]]], np.float32)
+    pixels = cv2.perspectiveTransform(origin, view.model_to_view)[0]
+    pixels_per_mm = float(np.sqrt(abs(np.linalg.det(
+        np.stack((pixels[1] - pixels[0], pixels[2] - pixels[0]))
+    ))))
     return FieldMasks(
         expected, observed & (wire_distance > sample_margin_mm),
-        observed & (wire_distance <= wire_margin_mm), observed,
+        observed & (wire_distance <= wire_margin_mm), observed, pixels_per_mm,
     )
 
 
@@ -139,6 +145,62 @@ def fit_board_color_models(
     return tuple(models)
 
 
+def fit_global_color_models(
+    features: NDArray[np.float32],
+    observed_board: NDArray[np.bool_],
+    *,
+    minimum_samples: int = 64,
+    maximum_samples: int = 16000,
+) -> tuple[BoardColorModel, ...]:
+    """Experimental four-mode distribution of all observed board pixels.
+
+    No numbered-field assignment or wire exclusion is used for fitting. Clusters
+    are unlabeled modes, not guaranteed to correspond to the four paint colors.
+    """
+    from sklearn.cluster import KMeans
+
+    if minimum_samples < 4 or maximum_samples < 4 * minimum_samples:
+        raise ValueError("Global sample limits must support four color modes.")
+    samples = features[observed_board]
+    if len(samples) < 4 * minimum_samples:
+        raise InsufficientColorSamples("Insufficient observed board samples for four global modes.")
+    if len(samples) > maximum_samples:
+        samples = samples[np.linspace(0, len(samples) - 1, maximum_samples, dtype=int)]
+    if len(np.unique(samples, axis=0)) < 4:
+        raise InsufficientColorSamples("The observed board has fewer than four distinct colors.")
+    clustering = KMeans(n_clusters=4, n_init=3, random_state=0).fit(samples)
+    models = []
+    floors = np.array([0.025, 0.025, 0.05], np.float32)
+    for index in range(4):
+        cluster = samples[clustering.labels_ == index]
+        retained = cluster
+        for _ in range(3):
+            if len(retained) < minimum_samples:
+                raise InsufficientColorSamples(f"Insufficient support for global color mode {index}.")
+            center = np.median(retained, axis=0)
+            scale = np.maximum(1.4826 * np.median(np.abs(retained - center), axis=0), floors)
+            distance = np.linalg.norm((retained - center) / scale, axis=1)
+            retained = retained[distance <= 4.5]
+        if len(retained) < minimum_samples:
+            raise InsufficientColorSamples(f"Insufficient support for global color mode {index}.")
+        center = np.median(retained, axis=0).astype(np.float32)
+        scale = np.maximum(
+            1.4826 * np.median(np.abs(retained - center), axis=0), floors
+        ).astype(np.float32)
+        models.append(BoardColorModel(
+            f"mode_{index}", center, scale, len(cluster), len(retained)
+        ))
+    return tuple(models)
+
+
+def keep_color_anomalies(
+    probabilities: NDArray[np.float32], masks: FieldMasks, minimum_area_px: int
+) -> NDArray[np.float32]:
+    """Comparison baseline: no grid or component removal, but respect coverage."""
+    del minimum_area_px
+    return np.where(masks.observed_board, probabilities, 0).astype(np.float32)
+
+
 def suppress_wire_artifacts(
     probabilities: NDArray[np.float32], masks: FieldMasks, minimum_area_px: int
 ) -> NDArray[np.float32]:
@@ -156,9 +218,35 @@ def suppress_wire_artifacts(
     return cleaned
 
 
+def preserve_dart_support(
+    probabilities: NDArray[np.float32], masks: FieldMasks, minimum_area_px: int
+) -> NDArray[np.float32]:
+    """Keep thin interior components and restore only nearby wire-crossing evidence.
+
+    Wire pixels never seed components. A single bounded dilation can restore
+    raw evidence within 3 mm of retained interiors, without flooding the grid.
+    No opening is applied: it would erase narrow shafts.
+    """
+    support = (
+        (probabilities >= 0.2) & masks.sample_interior & masks.observed_board
+    ).astype(np.uint8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(support, connectivity=8)
+    keep = np.zeros(count, dtype=bool)
+    keep[1:] = stats[1:, cv2.CC_STAT_AREA] >= minimum_area_px
+    core = keep[labels]
+    radius = max(1, round(3.0 * masks.pixels_per_mm))
+    near_core = cv2.dilate(
+        core.astype(np.uint8),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1)),
+    ) > 0
+    retain = core | (~masks.sample_interior & near_core & masks.observed_board)
+    return np.where(retain, probabilities, 0).astype(np.float32)
+
+
 CleanupStage = Callable[
     [NDArray[np.float32], FieldMasks, int], NDArray[np.float32]
 ]
+ColorAssignment = Literal["field", "board_union", "global"]
 
 
 class RobustBoardColorSegmentationStage:
@@ -171,7 +259,8 @@ class RobustBoardColorSegmentationStage:
         wire_margin_mm: float = 1.0,
         minimum_samples: int = 64,
         minimum_component_area_mm2: float = 3.0,
-        cleanup: CleanupStage = suppress_wire_artifacts,
+        cleanup: CleanupStage = preserve_dart_support,
+        color_assignment: ColorAssignment = "field",
     ) -> None:
         if (
             not np.isfinite([sample_margin_mm, wire_margin_mm, minimum_component_area_mm2]).all()
@@ -181,11 +270,14 @@ class RobustBoardColorSegmentationStage:
             or not 4 <= minimum_samples <= 12000
         ):
             raise ValueError("Invalid sampling, wire, component-area or sample-count settings.")
+        if color_assignment not in ("field", "board_union", "global"):
+            raise ValueError("Color assignment must be field, board_union or global.")
         self.sample_margin_mm = sample_margin_mm
         self.wire_margin_mm = wire_margin_mm
         self.minimum_samples = minimum_samples
         self.minimum_component_area_mm2 = minimum_component_area_mm2
         self.cleanup = cleanup
+        self.color_assignment = color_assignment
 
     def __call__(
         self, view: NormalizedBoardView, board: BoardGeometry,
@@ -197,8 +289,11 @@ class RobustBoardColorSegmentationStage:
         start = perf_counter()
         if view.source_coverage is None:
             return StageOutcome.failed("Color modeling requires observed source coverage.")
+        # The detector already aligns alternating paint modulo 36 degrees.
+        # An untrusted numeral must not redefine that paint alignment.
+        color_orientation = orientation if orientation.confident else OrientationEstimate(0, 0, False)
         masks = build_field_masks(
-            view, orientation, sample_margin_mm=self.sample_margin_mm,
+            view, color_orientation, sample_margin_mm=self.sample_margin_mm,
             wire_margin_mm=self.wire_margin_mm,
         )
         features = board_color_features(view.image)
@@ -209,27 +304,42 @@ class RobustBoardColorSegmentationStage:
                 field_sample_interiors=masks.sample_interior.astype(np.uint8) * 255,
                 expected_wires=masks.wire_region.astype(np.uint8) * 255,
                 source_coverage=view.source_coverage.copy(),
+                color_alignment_correction_deg=np.array([color_orientation.correction_deg]),
+                color_alignment_uses_detector=np.array([not orientation.confident], dtype=np.uint8),
+                color_assignment=np.array([self.color_assignment]),
             )
         start = perf_counter()
         try:
-            models = fit_board_color_models(features, masks, minimum_samples=self.minimum_samples)
+            if self.color_assignment == "global":
+                models = fit_global_color_models(
+                    features, masks.observed_board, minimum_samples=self.minimum_samples,
+                    maximum_samples=max(16000, 4 * self.minimum_samples),
+                )
+            else:
+                models = fit_board_color_models(features, masks, minimum_samples=self.minimum_samples)
         except InsufficientColorSamples as exc:
             timings["fit_color_models"] = (perf_counter() - start) * 1000
             return StageOutcome.failed(str(exc), artifacts=artifacts, substep_timings_ms=timings)
         timings["fit_color_models"] = (perf_counter() - start) * 1000
         start = perf_counter()
         raw = np.zeros(view.image.shape[:2], np.float32)
-        for color_id, model in enumerate(models):
-            field = masks.expected_color == color_id
-            distance = np.linalg.norm((features[field] - model.center) / model.scale, axis=1)
-            raw[field] = np.clip((distance - 3.0) / 5.0, 0, 1)
+        if self.color_assignment == "field":
+            for color_id, model in enumerate(models):
+                field = masks.expected_color == color_id
+                distance = np.linalg.norm((features[field] - model.center) / model.scale, axis=1)
+                raw[field] = np.clip((distance - 3.0) / 5.0, 0, 1)
+        else:
+            observed_features = features[masks.observed_board]
+            distance = np.full(len(observed_features), np.inf, np.float32)
+            for model in models:
+                np.minimum(
+                    distance, np.linalg.norm((observed_features - model.center) / model.scale, axis=1),
+                    out=distance,
+                )
+            raw[masks.observed_board] = np.clip((distance - 3.0) / 5.0, 0, 1)
         timings["color_anomalies"] = (perf_counter() - start) * 1000
         start = perf_counter()
-        # Convert physical area through the model-to-view Jacobian at the bull.
-        origin = np.array([[[0., 0.], [1., 0.], [0., 1.]]], np.float32)
-        pixels = cv2.perspectiveTransform(origin, view.model_to_view)[0]
-        area_scale = abs(float(np.linalg.det(np.stack((pixels[1] - pixels[0], pixels[2] - pixels[0])))))
-        minimum_area = max(1, round(self.minimum_component_area_mm2 * area_scale))
+        minimum_area = max(1, round(self.minimum_component_area_mm2 * masks.pixels_per_mm**2))
         cleaned = self.cleanup(raw.copy(), masks, minimum_area)
         if cleaned.shape != raw.shape:
             raise ValueError("Segmentation cleanup changed the likelihood-map shape.")
@@ -243,6 +353,7 @@ class RobustBoardColorSegmentationStage:
                 color_model_support=np.array(
                     [[model.sample_count, model.retained_count] for model in models], dtype=np.int32
                 ),
+                color_model_names=np.array([model.name for model in models]),
                 raw_color_anomalies=raw,
                 dart_likelihood=cleaned.copy(),
                 orientation_confident=np.array([orientation.confident], dtype=np.uint8),

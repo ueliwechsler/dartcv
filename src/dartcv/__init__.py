@@ -67,6 +67,9 @@ from .color_dart_segmentation import (
     board_color_features,
     build_field_masks,
     fit_board_color_models,
+    fit_global_color_models,
+    keep_color_anomalies,
+    preserve_dart_support,
     suppress_wire_artifacts,
 )
 from .edge_detection import canny_edges
@@ -108,6 +111,9 @@ __all__ = [
     "board_color_features",
     "build_field_masks",
     "fit_board_color_models",
+    "fit_global_color_models",
+    "keep_color_anomalies",
+    "preserve_dart_support",
     "suppress_wire_artifacts",
     "extract_printed20_template",
     "unwrap_number_ring",

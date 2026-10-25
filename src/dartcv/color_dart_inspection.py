@@ -196,8 +196,6 @@ def likelihood_overlay(image: Image, probabilities: np.ndarray) -> Image:
 
 def plot_color_segmentation(result: StageOutcome[DartLikelihoodMap]) -> Figure:
     """Show field sampling, fitted models and raw/cleaned anomalies, including failures."""
-    from .color_dart_segmentation import COLOR_NAMES
-
     if "expected_field_color" not in result.artifacts:
         raise ValueError("Run segmentation with diagnostics=True before plotting.")
     figure = Figure(figsize=(15, 10), layout="constrained")
@@ -207,9 +205,14 @@ def plot_color_segmentation(result: StageOutcome[DartLikelihoodMap]) -> Figure:
     colors = np.zeros((*field.shape, 3), np.uint8)
     for color_id in range(4):
         colors[field == color_id] = palette[color_id]
+    global_fit = result.artifacts["color_assignment"][0] == "global"
     panels = [
         ("Expected fields: red / green / beige / black", colors, None),
-        ("Sampling interiors (wire margins excluded)", result.artifacts["field_sample_interiors"], "gray"),
+        (
+            "Field interiors (NOT used for global fitting)" if global_fit
+            else "Sampling interiors (wire margins excluded)",
+            result.artifacts["field_sample_interiors"], "gray",
+        ),
         ("Expected wire suppression", result.artifacts["expected_wires"], "gray"),
         ("Raw color anomalies (includes metal)", result.artifacts.get("raw_color_anomalies"), "magma"),
         ("Cleaned dart-likelihood map (not tips)", result.artifacts.get("dart_likelihood"), "magma"),
@@ -233,9 +236,15 @@ def plot_color_segmentation(result: StageOutcome[DartLikelihoodMap]) -> Figure:
         figure.suptitle(result.failure, color="red")
     else:
         counts = result.artifacts["color_model_support"]
-        support = ", ".join(f"{name}: {kept}/{total}" for name, (total, kept) in zip(COLOR_NAMES, counts))
+        names = result.artifacts["color_model_names"]
+        support = ", ".join(f"{name}: {kept}/{total}" for name, (total, kept) in zip(names, counts))
         uncertain = not bool(result.artifacts["orientation_confident"][0])
+        alignment = (
+            "detector paint alignment; "
+            if result.artifacts["color_alignment_uses_detector"][0] else ""
+        )
         figure.suptitle(
-            ("UNCERTAIN orientation; " if uncertain else "") + "retained samples: " + support
+            ("UNCERTAIN numbered orientation; " if uncertain else "")
+            + alignment + f"{result.artifacts['color_assignment'][0]}; retained samples: " + support
         )
     return figure

@@ -33,13 +33,15 @@ or implement a complete live scoring application.
 | [color-based dart pipeline](../src/dartcv/color_dart_pipeline.py) | Separate, incrementally implemented pipeline for board-aware multi-dart scoring | `ColorBasedDartRecognitionPipeline` uses typed replaceable stages; currently implements board localization and normalized-board warping, with later stages injected |
 | [color-dart inspection](../src/dartcv/color_dart_inspection.py) | Explicit geometry overlays and board/orientation visualization | `draw_board_geometry()` returns a copied BGR image; `plot_board_preparation()` and `plot_orientation()` return Matplotlib figures without display or file I/O |
 | [color-dart orientation](../src/dartcv/color_dart_orientation.py) | Board-style-specific printed-20 template matching on an optional wider rectification | `Printed20OrientationStage(template)`, `extract_printed20_template()`, `unwrap_number_ring()`; NumPy/OpenCV, no OCR, downloads or image I/O |
-| [color-dart segmentation](../src/dartcv/color_dart_segmentation.py) | Geometry-derived field sampling, four per-image robust HSV-cone models, initial anomaly map and replaceable cleanup | `RobustBoardColorSegmentationStage`, `build_field_masks()`, `fit_board_color_models()`, `suppress_wire_artifacts()`; no dart-count or tip inference |
+| [color-dart segmentation](../src/dartcv/color_dart_segmentation.py) | Geometry-derived field sampling, robust HSV-cone models, experimental whole-board alternatives, support-preserving cleanup | `RobustBoardColorSegmentationStage`, `build_field_masks()`, `fit_board_color_models()`, `fit_global_color_models()`, `preserve_dart_support()`; legacy hard cleanup remains available |
+| [segmentation evaluation](../src/dartcv/color_dart_evaluation.py) | Same-input color/cleanup ablations and sparse manual-probe evaluation | Nine `segmentation_variants()`, `compare_segmentations()`, explicit reference-frame projection, eligible/excluded patch counts; not whole-mask accuracy |
 | [color-board analysis](../src/dartcv/color_dart_analysis.py) | Run the implemented prefix without fake tip/scoring stages | `analyze_board_colors()` returns `ColorBoardAnalysis` with preparation, orientation/segmentation outcomes and stage timings; accepts injected stages |
 | [notebook batch](../src/dartcv/notebook_batch.py) | Bounded, sequential final-output contact sheets | `image_batch_figures(paths, process)` yields pages of thumbnails with filenames/status/timing; expected failures are visible tiles |
 | [board-inspection notebook](../examples/color_dart_board_inspection.ipynb) | Selected multi-dart photo inspection, detector-artifact views, optional resolution comparison | Calls `prepare_board()` without unfinished recognition stages; presents diagnostics and timings |
 | [orientation-inspection notebook](../examples/color_dart_orientation_inspection.ipynb) | Explicit reference-template extraction, selected-photo matching and coverage/annotation inspection | Uses the small manual orientation manifest and optional number-ring normalizer; does not change the existing board-inspection notebook |
 | [segmentation notebook](../examples/color_dart_segmentation_inspection.ipynb) | Field masks, model parameters/support, raw/cleaned anomalies and compact batches | Same analysis helper/stage instances as the overview; no automatic tips/scores |
 | [combined overview](../examples/color_dart_pipeline_overview.ipynb) | All implemented color stages, plus final-output-only batch inspection | Preparation/orientation/segmentation figures and timings in one notebook; future stages remain explicitly absent |
+| [segmentation comparison](../examples/color_dart_segmentation_comparison.ipynb) | Selected-image 3x3 ablation overlays, selectable final-output batches and sparse evaluation | Field/board-union/global fitting crossed with none/hard/support cleanup, identical geometry and frozen annotation frames |
 | [recognition notebook](../examples/dart_recognition.ipynb) | Staged single-image orchestration, configuration, plotting, scoring, optional export | Defaults to classical boxes with session reuse keyed by settings/calibration; OWLv2 remains an optional library alternative; number and tip slots remain unset |
 
 ## Runtime and data flow
@@ -245,6 +247,17 @@ Sample interiors exclude a configurable 2.5 mm margin around nominal radial
 and circular wires, plus missing source pixels. Models pool all interiors of
 the same color; they are not fitted independently to each wedge.
 
+The segmentation iteration separates paint alignment from numbered orientation:
+when `orientation.confident=False`, the stage retains the detector's paint
+alignment (zero additional correction) instead of rotating fields by an
+unreliable numeral guess. This relies on the detector homography aligning the
+alternating paint modulo 36 degrees; injected normalizers/localizers must
+preserve that convention. Diagnostics explicitly record
+`color_alignment_correction_deg` and `color_alignment_uses_detector`.
+The original numbered-orientation uncertainty is NOT cleared, and scoring
+must not infer a verified 20 from successful color modeling. Confident but
+incorrect numeral matches and incorrect geometry can still spoil field masks.
+
 `board_color_features()` maps OpenCV HSV to
 `[s*v*cos(h), s*v*sin(h), v]` with s/v in [0,1] and h wrapped continuously.
 Hue contributes little for dark/achromatic pixels. Each color uses at most
@@ -262,6 +275,22 @@ anomaly strength is `clip((robust_distance - 3) / 5, 0, 1)`, not a calibrated
 dart probability. Expected color IDs are red=0, green=1, beige=2, black=3,
 outside/unobserved=255. The returned `DartLikelihoodMap` remains float32 in [0,1].
 
+That is the default `color_assignment="field"`. Two explicitly experimental
+alternatives are available at the user's request:
+`"board_union"` fits the same field-interior models but compares each pixel
+against the closest of all four models, isolating the value of expected-field
+matching. `"global"` fits four unlabeled modes to the entire observed scoring
+board, including wires, without field-based training groups. It samples at most
+16000 pixels (or enough for the configured four minimum supports), uses
+deterministic K-means (three initializations, seed zero), then robustly trims
+each cluster and compares pixels to the closest resulting mode. Cluster labels
+are `mode_0` etc., not certified red/green/beige/black. Low support/fewer than
+four distinct colors fails explicitly. It uses the existing scikit-learn
+dependency, imported lazily; first-fit timing includes that import.
+Whole-board matching can suppress dart colors resembling any paint class, and
+global fitting can absorb a dart's appearance into its distribution. Do not
+promote it to the default simply because its output has fewer foreground pixels.
+
 **Metal suppression:** start with geometry-derived expected wire regions plus
 edge/small-component cleanup; keep this replaceable inside segmentation.
 Do not assume `detect_board()` returns physical wires, and do not treat metal
@@ -272,7 +301,7 @@ GrabCut refinement. These are candidate internal operations, not a requirement
 to run every operation or expose each as a top-level pipeline stage.
 Expose internal named artifacts/substep timings as those operations are added.
 
-Milestone 4's default `suppress_wire_artifacts()` zeros a 1 mm band around nominal
+Milestone 4's original `suppress_wire_artifacts()` zeros a 1 mm band around nominal
 wires, opens >=0.5 anomaly support with a 3x3 ellipse, and retains components
 of at least 3 mm² (converted to pixels at the model origin). Inject an alternative
 `cleanup` callable into the segmentation stage to replace this policy. It can
@@ -283,6 +312,19 @@ do not treat cleaned components as separate darts or infer their contact points.
 wires, raw/cleaned maps and the final overlay. Internal timings separately cover
 mask/features, fitting, anomaly evaluation and cleanup. Uncertain orientation
 is retained on the analysis result and prominently labeled in figures/batches.
+
+The **revised default** is `preserve_dart_support()`: retain >=0.2 raw-anomaly
+components of at least 3 mm² seeded only in sampling interiors (normally
+>2.5 mm from nominal wires). Do not apply an opening. Restore original scores
+in the excluded wire-margin area only within a single 3 mm dilation of retained
+interiors. Restored wire pixels never seed another growth iteration, so an
+entire connected grid cannot flood from one dart. This restores evidence, not
+synthetic filled-in dart pixels; source coverage remains mandatory. Physical
+area/reach use model-to-view scale at the bull. Thin unsupported components,
+color-matching dart regions and wholly off-board parts can still be missed.
+Nearby reflections may be restored as well. `keep_color_anomalies()` provides
+the no-cleanup comparison; `suppress_wire_artifacts()` remains the hard-cleanup
+comparison. All retain the existing injected cleanup callable signature.
 
 **Board-entry and score semantics:**
 
@@ -360,6 +402,16 @@ success-shaped placeholders.
    for all implemented color stages in one place. Both run the explicit reference
    setup once, then `analyze_board_colors()` on a selected photo. No real tip or
    independent scoring stage is supplied yet.
+   **Segmentation iteration, done:** reproduced shaft loss and noisy masks from
+   unreliable numbered orientation; revised the default cleanup/color alignment
+   policy and added whole-board alternatives. Open
+   [color_dart_segmentation_comparison.ipynb](../examples/color_dart_segmentation_comparison.ipynb).
+   Its selected-image matrix compares nine variants; `BATCH_VARIANT` selects the
+   compact batch strategy; `RUN_PROBE_EVALUATION` reruns the six-photo sparse
+   checks with initial regression/challenge results separated. The default
+   selected image is a deliberately noisy challenge case. The overview and
+   segmentation notebook have optional `RUN_ABLATION`
+   cells without replacing their existing user-selected settings.
 6. **Next milestone:** entry-point localization, then independent scoring incrementally.
    Their algorithm details remain open; apply the agreed uncertainty, miss,
    ordering, and aggregate contracts rather than inventing new semantics.
@@ -390,8 +442,17 @@ records one template reference, two visible-label checks with approximate
 manually inspected source-image centers, and one occluded-label check.
 The centers were visually selected independently of the matcher, with an
 estimated 24 px uncertainty. This is a same-board development fixture, not an
-accuracy benchmark; the reference is not counted as validation. Ground-truth
-board geometry, dart entries and scores remain unannotated. Extend annotations
+accuracy benchmark; the reference is not counted as validation.
+The [segmentation probe manifest](../data/annotations/color_dart_segmentation.json)
+adds independently visually selected flight/shaft/background/wire points on four
+initial regression photos and two additional noisy challenge photos (no wire
+probes are labeled on those latter two). Its 768 px reference rectifications and
+`number_match` outcomes are frozen
+development inputs, NOT manually verified board homographies/orientation truth.
+`evaluate_sparse_probes()` projects these patches into a current rectification and
+excludes unobserved/out-of-scoring-view patches. It does not infer a full dart mask.
+Ground-truth board geometry, full segmentation masks, dart entries and scores
+remain unannotated. Extend annotations
 as each later module needs them. Keep the imagery local/DVC-managed and do not publish photo metadata or
 embed the full dataset into notebooks. Update this status and the relevant
 contracts/limitations after each milestone so the next session can resume
@@ -455,7 +516,12 @@ run and downsizes display previews, not processing inputs.
 - [Segmentation tests](../tests/test_color_dart_segmentation.py) cover signed field
   assignments, bull/ring masks, hue continuity, robust minority-contamination
   rejection, missing-source exclusion, wire/component cleanup replacement,
-  explicit sample failures and partial-prefix orchestration.
+  explicit sample failures and partial-prefix orchestration, thin shaft crossings,
+  bounded grid restoration, unreliable number matches, and whole-board tradeoffs.
+  Optional real-photo sparse checks use the fixed annotation frames.
+- [Segmentation evaluation tests](../tests/test_color_dart_evaluation.py) cover
+  reference-frame projection, missing-coverage exclusions, explicit failures and
+  the nine-variant comparison surface.
 - [Batch tests](../tests/test_notebook_batch.py) cover bounded lazy pages, BGR/RGB
   thumbnail conversion, visible failures and propagation of unexpected bugs.
 - Run `uv run --group dev pytest`; use one explicitly selected real image for a
@@ -515,6 +581,84 @@ uv run --group dev pytest -q
 
 No accuracy claims for entry-point localization or new scoring follow from
 these checks: those algorithms remain unimplemented.
+
+### Segmentation iteration: recorded findings (2026-10-25)
+
+The user prioritized retaining visible flights and thin shaft evidence, not
+merely displaying a sparse mask. Four locally inspected photos span obscured
+`20`, separated shafts, overlapping shafts, and overlapping white flights.
+A cached deterministic repro showed the original cleanup lowering a clearly
+visible shaft patch at [355,271] in the second photo from a raw mean of 0.497
+to 0.093. The revised result is 0.485. Synthetic regressions separately reproduced
+wire-crossing erasure and a wrong weak numeral rotating the field masks.
+
+The table below reports **positive sparse patches / eligible patches**, using
+a mean score threshold of 0.5. Higher is better for flights/shafts; lower for
+board/wire backgrounds. All comparisons use identical fixed 768 px geometry.
+One outside-scoring-view flight patch is excluded; these are development probes,
+not full-image recall/precision, held-out accuracy or IoU.
+
+| Variant | Flights retained | Shafts retained | Board false positives | Wire false positives |
+| --- | --- | --- | --- | --- |
+| Original milestone-4 baseline (before both fixes) | 11/19 | 30/41 | 2/40 | 3/32 |
+| Field / no cleanup | 17/19 | 35/41 | 9/40 | 2/32 |
+| Field / hard cleanup | 10/19 | 31/41 | 0/40 | 0/32 |
+| **Field / support (new default)** | **17/19** | **35/41** | **0/40** | **0/32** |
+| Any field-trained board color / no cleanup | 13/19 | 23/41 | 3/40 | 1/32 |
+| Any field-trained board color / hard cleanup | 6/19 | 14/41 | 0/40 | 0/32 |
+| Any field-trained board color / support | 13/19 | 22/41 | 0/40 | 0/32 |
+| Whole-board modes / no cleanup | 4/19 | 18/41 | 2/40 | 0/32 |
+| Whole-board modes / hard cleanup | 1/19 | 11/41 | 0/40 | 0/32 |
+| Whole-board modes / support | 4/19 | 18/41 | 0/40 | 0/32 |
+
+Conclusion for this subset: geometry-aware color assignment is useful; accepting
+any board color loses real dart pixels, and fitting the whole-board distribution
+loses still more. Blind grid removal also cuts shafts/flights. Interior-seeded,
+finite evidence restoration is a better compromise here, not a universal winner.
+Despite zero false positives on these sparse background probes, visual inspection
+still shows residual ring/reflection noise; do not claim that only darts remain.
+The unresolved next segmentation questions are color-matching dart regions,
+residual near-dart wire contamination, and broader lighting/board styles.
+
+Exploratory warm stage execution at 768 px was approximately 73–75 ms for
+field/support versus 104–111 ms for global/support on these four cached inputs,
+with BLAS/OpenMP threads limited to one. First global fitting cost about 298 ms
+including its lazy import. These figures exclude decoding, board detection and
+display, are not directly comparable with the older 1024 px measurements, and
+are not performance guarantees.
+
+The revised default was then run across **all 17 multi-dart photos**, and its
+contact sheet was visually inspected. This exposed substantial background
+stripes/reflections in additional photos: the four initial cases are not
+representative enough to call segmentation solved. Two deliberately noisy
+cases were added to the manifest, with separate reporting rather than folding
+them into the already-fixed acceptance gates:
+
+| Additional challenge variant | Flights retained | Shafts retained | Board false positives |
+| --- | --- | --- | --- |
+| Field / support | 11/12 | 10/18 | 12/20 |
+| Any field-trained board color / support | 5/12 | 5/18 | 3/20 |
+| Whole-board modes / support | 4/12 | 4/18 | 0/20 |
+
+These challenging photos make the tradeoff explicit: a global model produces a
+cleaner background but discards much more dart evidence. No tested strategy
+fully separates only darts. Keep field/support as the evidence-preserving
+default, not as a certified best method for every image.
+
+Follow-up probes found ordinary adjacent paint assigned to the wrong field and
+shadow/texture pixels outside narrow robust distributions. A small constant
+paint-angle search reduced noise in one case but not the other; stricter
+novel-color/thickness seeding reduced flight retention without resolving the
+noisiest case. Neither prototype was promoted into the library. Further work
+needs stronger geometric/photometric modeling or visible shaft/flight evidence,
+not simply a more destructive morphology threshold. The planned entry-point
+stage must retain access to raw evidence, not assume the cleaned map is complete.
+
+The final comparison notebook (selected image, compact batch, and six-photo
+evaluation) and the two existing notebooks' optional ablation cells were
+executed headlessly. The full repository suite passed **131 tests, 1 skipped**.
+The minimized real-photo shaft repro is covered by the optional sparse-photo
+test; synthetic crossing/uncertain-orientation regressions run without DVC data.
 Benchmark stage execution with diagnostics off and repeated representative
 inputs before choosing a latency target. Compare geometric quality as well as
 runtime; fast, successful execution is not sufficient evidence of correctness.

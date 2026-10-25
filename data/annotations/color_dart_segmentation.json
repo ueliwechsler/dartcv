@@ -1,0 +1,72 @@
+{
+  "description": "Manually inspected sparse development probes, not full dart masks or an independent accuracy benchmark. First four photos are regression cases; final two are additional noisy challenge cases with unresolved failures, NOT acceptance gates. Points mark visible flights, shafts, ordinary board and metal wires. Ambiguous boundaries and obscured contacts are omitted. No exactly-three-components assumption.",
+  "coordinates": "xy pixels in a 768x768 scoring view produced by the fixed model_to_source homography below, standard scoring radius 170 mm. Project through this fixed frame before evaluating a differently rectified view. Probe radius is 1 pixel for shafts, 2 pixels otherwise.",
+  "images": [
+    {
+      "image": "PXL_20261018_154231645.jpg",
+      "role": "regression",
+      "note": "20 occluded; baseline orientation selects the wrong numeral.",
+      "number_match": {"correction_deg": -102.25, "confidence": 0.5416480898857117, "confident": false},
+      "model_to_source": [[12.013314421414156, -0.6979401273696462, 3162.5968625068513], [1.3083344722741719, 10.316410830551785, 4028.2006972021327], [0.0002630448218224134, -0.000222951383123943, 1.0]],
+      "flight": [[355, 105], [375, 145], [390, 168], [537, 220], [554, 255], [576, 275]],
+      "shaft": [[360, 40], [355, 68], [351, 211], [342, 248], [333, 278], [480, 323], [455, 350], [498, 304]],
+      "board": [[380, 475], [355, 550], [309, 440], [240, 430], [100, 380], [500, 470], [570, 545], [430, 600], [200, 570], [605, 370]],
+      "wire": [[305, 372], [263, 362], [224, 353], [183, 345], [141, 336], [205, 210], [215, 583], [383, 624]]
+    },
+    {
+      "image": "PXL_20261018_154237729.jpg",
+      "role": "regression",
+      "note": "Three separated shafts; flights partly outside the scoring surface.",
+      "number_match": {"correction_deg": 0.25, "confidence": 0.8649865388870239, "confident": true},
+      "model_to_source": [[14.79596096182676, -0.04031393125953989, 3287.375747017117], [4.432775838770581, 13.124429108518955, 3699.117031791557], [0.001074796802178526, -2.175801224198215e-05, 1.0]],
+      "flight": [[514, 112], [550, 136], [575, 153], [690, 256], [720, 282]],
+      "shaft": [[370, 77], [392, 45], [411, 20], [355, 271], [392, 239], [444, 204], [472, 188], [472, 356], [524, 336], [571, 319], [620, 299]],
+      "board": [[383, 510], [365, 581], [313, 451], [243, 430], [100, 380], [505, 475], [570, 544], [435, 600], [200, 570], [605, 400]],
+      "wire": [[305, 372], [263, 362], [224, 353], [183, 345], [141, 336], [205, 210], [215, 583], [383, 624]]
+    },
+    {
+      "image": "PXL_20261018_154450629.jpg",
+      "role": "regression",
+      "note": "Overlapping darts at the top; mostly thin shaft evidence within scoring view.",
+      "number_match": {"correction_deg": 0.75, "confidence": 0.7060331106185913, "confident": true},
+      "model_to_source": [[16.23151681645546, -1.2747509682160814, 3289.046065744627], [2.4932438164076, 13.240913160520224, 3971.3904382556825], [0.0004890817421675122, -0.0003878209190434491, 1.0]],
+      "flight": [[394, 11], [422, 20], [510, 5]],
+      "shaft": [[380, 111], [387, 85], [395, 56], [409, 106], [417, 78], [426, 50], [439, 102], [455, 76], [471, 49], [374, 137], [398, 137], [416, 138]],
+      "board": [[383, 510], [365, 581], [313, 451], [243, 430], [100, 380], [505, 475], [570, 544], [435, 600], [200, 570], [605, 400]],
+      "wire": [[305, 372], [263, 362], [224, 353], [183, 345], [141, 336], [205, 210], [215, 583], [383, 624]]
+    },
+    {
+      "image": "PXL_20261018_154539586.jpg",
+      "role": "regression",
+      "note": "Overlapping white flights and nearly horizontal metal shafts.",
+      "number_match": {"correction_deg": 0.0, "confidence": 0.8023474812507629, "confident": true},
+      "model_to_source": [[16.40805384394634, 1.1667853951751217, 3145.464392431734], [4.404911015666638, 16.488658961085434, 4256.108067568648], [0.001449792455435326, 0.0004030972181929523, 1.0]],
+      "flight": [[530, 262], [570, 246], [610, 300], [635, 345], [655, 363], [742, 324]],
+      "shaft": [[386, 309], [420, 303], [452, 294], [398, 354], [428, 350], [472, 345], [516, 340], [473, 327], [506, 328], [363, 356]],
+      "board": [[383, 510], [365, 581], [313, 451], [243, 430], [100, 380], [505, 475], [570, 544], [435, 600], [200, 570], [605, 420]],
+      "wire": [[305, 372], [263, 362], [224, 353], [183, 345], [141, 336], [205, 210], [215, 583], [383, 624]]
+    },
+    {
+      "image": "PXL_20261018_154400079.jpg",
+      "role": "challenge",
+      "note": "Additional noisy case discovered in the 17-photo inspection; field mismatch and shadow/texture outliers remain. Also the number-template reference, not an independent orientation validation photo.",
+      "number_match": {"correction_deg": 0.25, "confidence": 0.9896896481513977, "confident": true},
+      "model_to_source": [[14.47795317710131, -0.5066892975543335, 3047.6947214002225], [2.6026215587891897, 12.457447303674783, 3858.536352847526], [0.0006432158122322755, -0.00021402359672416182, 1.0]],
+      "flight": [[550, 225], [540, 260], [455, 355], [466, 398], [650, 422], [665, 450]],
+      "shaft": [[460, 276], [485, 269], [500, 264], [340, 410], [366, 399], [402, 389], [540, 450], [568, 442], [597, 433]],
+      "board": [[275, 501], [614, 507], [517, 525], [201, 576], [189, 591], [439, 625], [400, 631], [220, 724], [300, 550], [500, 540]],
+      "wire": []
+    },
+    {
+      "image": "PXL_20261018_154411671.jpg",
+      "role": "challenge",
+      "note": "Additional noisy overlapping-dart case; compare field retention against global-model erasure. Background points near paint boundaries are deliberate stress probes.",
+      "number_match": {"correction_deg": 1.75, "confidence": 0.708199679851532, "confident": true},
+      "model_to_source": [[10.73364624870734, -0.6644218939952474, 2813.300298694912], [-4.344135912277807, 13.382640612722353, 3544.816733567464], [-0.000834243838963359, -0.00022805095599115434, 1.0]],
+      "flight": [[230, 126], [260, 165], [120, 275], [166, 291], [337, 320], [363, 347]],
+      "shaft": [[326, 222], [348, 242], [370, 258], [230, 352], [260, 371], [285, 391], [423, 411], [443, 429], [468, 452]],
+      "board": [[275, 501], [614, 507], [517, 525], [201, 576], [189, 591], [439, 625], [400, 631], [220, 724], [300, 550], [500, 540]],
+      "wire": []
+    }
+  ]
+}

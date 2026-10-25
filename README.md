@@ -139,11 +139,27 @@ in `dart_scorer_pipeline.ipynb` uses the older scorer prototype, not the new col
 pipeline. Expected read/detection failures are shown rather than silently skipped.
 
 `RobustBoardColorSegmentationStage` fits per-image field-interior distributions
-in hue-wrapping HSV-cone coordinates, then suppresses nominal wire bands and small
-components. Cleanup is replaceable; raw anomalies and model support remain
-inspectable. The map is heuristic: reflections can remain, thin shafts can be
-removed, and uncertain orientation can spoil field assignments. No blob is
-automatically declared a dart or assigned a score.
+in hue-wrapping HSV-cone coordinates. Its revised cleanup keeps thin interior
+components and restores nearby wire-crossing evidence without flooding the grid
+or opening away shafts. A weak numeral match retains the detector's paint
+alignment; numbered orientation remains uncertain. Raw anomalies and model
+support remain inspectable. Reflections and missed color-matching dart pixels
+remain possible; no blob is automatically declared a dart or assigned a score.
+
+Use [the segmentation comparison notebook](examples/color_dart_segmentation_comparison.ipynb)
+to compare **field-specific**, **any board color**, and **whole-board clustering**
+against no cleanup, hard grid removal, or support-preserving cleanup. It includes
+selected-image overlays, compact batches with `BATCH_VARIANT`, and an opt-in
+six-photo sparse annotation evaluation, split into four initial regressions and
+two additional unresolved challenge cases. The overview and detailed segmentation
+notebooks also have an optional `RUN_ABLATION` cell.
+
+On the small development subset, whole-board clustering removed more dart
+evidence because white flights/metal shafts resembled board colors. Field-specific
+matching remains the default, with `color_assignment="board_union"` or `"global"`
+available for experiments. These results do not establish full-mask accuracy;
+residual wire noise is still visible. The comparison notebook starts on a noisy
+challenge photo deliberately: no tested strategy cleanly isolates every dart.
 
 ## Dart recognition notebook
 
