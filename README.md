@@ -7,7 +7,6 @@ WIP: Dart computer vision framework enabling a smart phone to count your darts s
 - [Architecture](docs/architecture.md): components, data flow, and coordinate contracts.
 - [Architecture template](docs/templates/architecture.md): required structure for the living architecture document.
 - [Technical CV pipeline](docs/cv-pipeline.md): detection stages, refinement, fallbacks, and limitations.
-- [Agent instructions](AGENTS.md): documentation maintenance and verification rules for coding agents.
 
 ## Board detection and diagnostic images
 

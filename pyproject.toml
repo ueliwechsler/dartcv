@@ -1,7 +1,7 @@
 [project]
 name = "dartcv"
 version = "0.1.0"
-description = "Add your description here"
+description = "Dartboard computer vision and scoring tools."
 readme = "README.md"
 authors = [
     { name = "Benjamin Estermann", email = "benjamin.estermann@bluewin.ch" },
