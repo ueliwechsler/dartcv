@@ -688,9 +688,62 @@ enabled by this smoke check. The same file covers the scoring example assertions
 and explicit stale-analysis rejection without requiring photographs.
 The targeted suite passed **15 tests**.
 
+### Source-photo dart annotation tool (2026-10-25)
+
+`python -m dartcv.annotate` serves a small browser editor on loopback only,
+using the standard-library HTTP server and bundled HTML/CSS/JavaScript (no
+runtime dependencies added). `AnnotationStore` owns source decoding, identity
+checks, validated per-photo JSON, atomic replacement, and optimistic revisions
+to prevent overwriting another tab. The server serves only the selected image
+directory and fixed UI assets; same-origin/Host checks and a session token
+protect write requests. Use one server per annotation directory.
+
+`dart_annotations.py` defines schema-version-1 labels, parsing, source-label
+projection, visible-mask evaluation and error plotting. Source coordinates
+were chosen over normalized coordinates so detector errors cannot change the
+annotation ground truth and off-board evidence remains represented. Photographs
+are OpenCV-decoded for both display and pipeline, with decoded dimensions and
+file SHA-256 stored; annotation resume/evaluation rejects changed sources.
+
+Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
+part; optional complete inferred silhouettes are separate. A physical tip is
+exact or hidden/unknown; embedded/not-embedded/unknown contact determines
+whether it is a board entry point. Ignore polygons identify genuinely
+ambiguous foreground. Draft/completed is explicit, with per-dart visible-region
+checks and a human assertion of exhaustive labeling at completion.
+
+The browser implements polygon/vertex editing, zoom/pan, per-dart grouping,
+tip placement, copy-to-inferred, ignore regions, undo/redo, explicit save,
+save-and-next, unfinished navigation and dirty-state warnings. Save conflicts
+offer download-before-reload recovery. No algorithm proposals or automatic
+scores contaminate labels. No annotation save performs a git commit.
+
+The comparison notebook's opt-in `RUN_LABEL_EVALUATION` projects completed
+visible polygons into the existing scoring view and compares all nine
+variants. It reports dart recall ("dart retained"), precision ("detected
+pixels that are darts"), part recall, IoU and source-label coverage. It excludes
+ignore regions, unobserved/out-of-board pixels, inferred silhouettes and draft
+photos; empty denominators are unavailable. The overlay distinguishes
+retained darts, misses, noise and excluded coverage. Exact tips are stored for
+future localization evaluation, not scored against an unimplemented stage.
+Existing sparse-probe manifests remain unchanged.
+
+Tests in `test_dart_annotations.py` and `test_annotate.py` exercise round trips,
+invalid labels, overlaps/projection/coverage, missing denominators, source
+identity, notebook integration, editor state history, HTTP loading/saving,
+conflicts and origin restrictions. A local headless Chrome check exercised
+actual canvas drawing, vertex dragging, undo/redo, inferred copying, ignore
+regions, tip/contact marking, completion, save/navigation and reload without
+adding browser-test dependencies. Usage and labeling instructions are in
+[`dart-annotation.md`](dart-annotation.md). The full suite passed **157 tests,
+1 skipped**. The real CLI was also started and queried against all 17 local
+multi-dart photos, including full-resolution source metadata, then stopped.
+
 ## Related documentation and maintenance
 
 - [README](../README.md): commands, outputs, setup, and data workflows.
+- [Annotation protocol](dart-annotation.md): local editor, visible/inferred
+  labeling rules, JSON coordinates and evaluation semantics.
 - [CV pipeline](cv-pipeline.md): algorithm stages, frames, acceptance rules,
   diagnostics, and technical limitations.
 - [Glossary](../GLOSSARY.md): canonical board-entry/orientation/field terminology.

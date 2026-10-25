@@ -85,6 +85,19 @@ default cells in fresh IPython sessions, with outputs isolated in temporary
 directories. Image notebooks are skipped if local DVC photographs are absent.
 Optional batch/ablation switches remain off in this smoke check.
 
+## Annotate darts locally
+
+Run `uv run python -m dartcv.annotate` and open `http://127.0.0.1:8765`.
+The local browser editor supports zoom/pan, per-dart editable polygons,
+flight/shaft labels, optional inferred outlines, exact/unknown tips, ignore
+regions, undo/redo, and save/resume. Images stay local and unchanged.
+
+Follow [the annotation protocol](docs/dart-annotation.md). Save complete
+source-coordinate labels under `data/annotations/darts/`, then enable
+`RUN_LABEL_EVALUATION` in the segmentation comparison notebook for dart/part
+retention, foreground precision, IoU, coverage, and an error overlay. Inferred
+outlines and draft photos are not segmentation ground truth.
+
 ## Dart scoring notebook
 
 [examples/dart_scorer_pipeline.ipynb](examples/dart_scorer_pipeline.ipynb) stages the
