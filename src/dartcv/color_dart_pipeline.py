@@ -170,6 +170,7 @@ class NormalizedBoardView:
     source_to_view: Matrix3
     view_to_source: Matrix3
     number_ring: NumberRingView | None = None
+    source_coverage: Image | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -486,6 +487,16 @@ def normalize_board_view(
         borderMode=cv2.BORDER_CONSTANT,
     )
     mask = np.zeros((output_size_px, output_size_px), dtype=np.uint8)
+    yy, xx = np.indices(mask.shape, dtype=np.float32)
+    source_points = cv2.perspectiveTransform(
+        np.stack((xx, yy), axis=-1), view_to_source
+    )
+    source_x, source_y = source_points[..., 0], source_points[..., 1]
+    source_coverage = (
+        np.isfinite(source_points).all(axis=-1)
+        & (source_x >= 0) & (source_x <= image.shape[1] - 1)
+        & (source_y >= 0) & (source_y <= image.shape[0] - 1)
+    ).astype(np.uint8) * 255
     cv2.circle(
         mask,
         (round(center), round(center)),
@@ -493,7 +504,10 @@ def normalize_board_view(
         255,
         thickness=cv2.FILLED,
     )
-    artifacts = {"normalized_board": normalized, "board_mask": mask}
+    artifacts = {
+        "normalized_board": normalized, "board_mask": mask,
+        "source_coverage": source_coverage,
+    }
     number_ring = None
     if number_ring_radius_mm is not None:
         ring_scale = (output_size_px - 1) / (2.0 * number_ring_radius_mm)
@@ -523,6 +537,7 @@ def normalize_board_view(
         source_to_view=source_to_view,
         view_to_source=view_to_source,
         number_ring=number_ring,
+        source_coverage=source_coverage,
     )
     return StageOutcome.succeeded(
         view,

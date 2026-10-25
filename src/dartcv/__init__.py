@@ -59,6 +59,16 @@ from .color_dart_orientation import (
     extract_printed20_template,
     unwrap_number_ring,
 )
+from .color_dart_analysis import ColorBoardAnalysis, analyze_board_colors
+from .color_dart_segmentation import (
+    BoardColorModel,
+    FieldMasks,
+    RobustBoardColorSegmentationStage,
+    board_color_features,
+    build_field_masks,
+    fit_board_color_models,
+    suppress_wire_artifacts,
+)
 from .edge_detection import canny_edges
 
 
@@ -90,6 +100,15 @@ __all__ = [
     "NormalizedBoardView",
     "NumberRingView",
     "Printed20OrientationStage",
+    "ColorBoardAnalysis",
+    "analyze_board_colors",
+    "BoardColorModel",
+    "FieldMasks",
+    "RobustBoardColorSegmentationStage",
+    "board_color_features",
+    "build_field_masks",
+    "fit_board_color_models",
+    "suppress_wire_artifacts",
     "extract_printed20_template",
     "unwrap_number_ring",
     "normalize_board_view",

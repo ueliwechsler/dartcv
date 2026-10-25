@@ -10,6 +10,7 @@ from .color_dart_pipeline import (
     BOARD_RADII_MM,
     BoardGeometry,
     BoardPreparationResult,
+    DartLikelihoodMap,
     Image,
     Matrix3,
     OrientationEstimate,
@@ -180,5 +181,61 @@ def plot_orientation(result: StageOutcome[OrientationEstimate]) -> Figure:
         figure.suptitle(
             f"{label}: clockwise correction {value.correction_deg:.2f} degrees; "
             f"match strength {value.confidence:.3f}"
+        )
+    return figure
+
+
+def likelihood_overlay(image: Image, probabilities: np.ndarray) -> Image:
+    """Paint anomaly strength in red without modifying the input."""
+    if probabilities.shape != image.shape[:2]:
+        raise ValueError("Likelihood map and image must share dimensions.")
+    output = image.astype(np.float32)
+    alpha = (0.7 * probabilities)[..., None]
+    return np.clip(output * (1 - alpha) + np.array([0, 0, 255]) * alpha, 0, 255).astype(np.uint8)
+
+
+def plot_color_segmentation(result: StageOutcome[DartLikelihoodMap]) -> Figure:
+    """Show field sampling, fitted models and raw/cleaned anomalies, including failures."""
+    from .color_dart_segmentation import COLOR_NAMES
+
+    if "expected_field_color" not in result.artifacts:
+        raise ValueError("Run segmentation with diagnostics=True before plotting.")
+    figure = Figure(figsize=(15, 10), layout="constrained")
+    axes = figure.subplots(2, 3).flat
+    field = result.artifacts["expected_field_color"]
+    palette = np.array([[220, 30, 30], [30, 150, 60], [210, 190, 130], [30, 30, 30]], np.uint8)
+    colors = np.zeros((*field.shape, 3), np.uint8)
+    for color_id in range(4):
+        colors[field == color_id] = palette[color_id]
+    panels = [
+        ("Expected fields: red / green / beige / black", colors, None),
+        ("Sampling interiors (wire margins excluded)", result.artifacts["field_sample_interiors"], "gray"),
+        ("Expected wire suppression", result.artifacts["expected_wires"], "gray"),
+        ("Raw color anomalies (includes metal)", result.artifacts.get("raw_color_anomalies"), "magma"),
+        ("Cleaned dart-likelihood map (not tips)", result.artifacts.get("dart_likelihood"), "magma"),
+        ("Final anomaly overlay", None, None),
+    ]
+    if result.value is not None:
+        panels[-1] = (
+            panels[-1][0],
+            cv2.cvtColor(likelihood_overlay(
+                result.artifacts["normalized_board"], result.value.probabilities
+            ), cv2.COLOR_BGR2RGB), None,
+        )
+    for axis, (title, image, cmap) in zip(axes, panels, strict=True):
+        if image is not None:
+            axis.imshow(image, cmap=cmap, vmin=0, vmax=1 if cmap == "magma" else 255)
+        else:
+            axis.text(.5, .5, "Unavailable", ha="center", va="center")
+        axis.set_title(title)
+        axis.set_axis_off()
+    if result.failure is not None:
+        figure.suptitle(result.failure, color="red")
+    else:
+        counts = result.artifacts["color_model_support"]
+        support = ", ".join(f"{name}: {kept}/{total}" for name, (total, kept) in zip(COLOR_NAMES, counts))
+        uncertain = not bool(result.artifacts["orientation_confident"][0])
+        figure.suptitle(
+            ("UNCERTAIN orientation; " if uncertain else "") + "retained samples: " + support
         )
     return figure

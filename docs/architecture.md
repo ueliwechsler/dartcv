@@ -33,8 +33,13 @@ or implement a complete live scoring application.
 | [color-based dart pipeline](../src/dartcv/color_dart_pipeline.py) | Separate, incrementally implemented pipeline for board-aware multi-dart scoring | `ColorBasedDartRecognitionPipeline` uses typed replaceable stages; currently implements board localization and normalized-board warping, with later stages injected |
 | [color-dart inspection](../src/dartcv/color_dart_inspection.py) | Explicit geometry overlays and board/orientation visualization | `draw_board_geometry()` returns a copied BGR image; `plot_board_preparation()` and `plot_orientation()` return Matplotlib figures without display or file I/O |
 | [color-dart orientation](../src/dartcv/color_dart_orientation.py) | Board-style-specific printed-20 template matching on an optional wider rectification | `Printed20OrientationStage(template)`, `extract_printed20_template()`, `unwrap_number_ring()`; NumPy/OpenCV, no OCR, downloads or image I/O |
+| [color-dart segmentation](../src/dartcv/color_dart_segmentation.py) | Geometry-derived field sampling, four per-image robust HSV-cone models, initial anomaly map and replaceable cleanup | `RobustBoardColorSegmentationStage`, `build_field_masks()`, `fit_board_color_models()`, `suppress_wire_artifacts()`; no dart-count or tip inference |
+| [color-board analysis](../src/dartcv/color_dart_analysis.py) | Run the implemented prefix without fake tip/scoring stages | `analyze_board_colors()` returns `ColorBoardAnalysis` with preparation, orientation/segmentation outcomes and stage timings; accepts injected stages |
+| [notebook batch](../src/dartcv/notebook_batch.py) | Bounded, sequential final-output contact sheets | `image_batch_figures(paths, process)` yields pages of thumbnails with filenames/status/timing; expected failures are visible tiles |
 | [board-inspection notebook](../examples/color_dart_board_inspection.ipynb) | Selected multi-dart photo inspection, detector-artifact views, optional resolution comparison | Calls `prepare_board()` without unfinished recognition stages; presents diagnostics and timings |
 | [orientation-inspection notebook](../examples/color_dart_orientation_inspection.ipynb) | Explicit reference-template extraction, selected-photo matching and coverage/annotation inspection | Uses the small manual orientation manifest and optional number-ring normalizer; does not change the existing board-inspection notebook |
+| [segmentation notebook](../examples/color_dart_segmentation_inspection.ipynb) | Field masks, model parameters/support, raw/cleaned anomalies and compact batches | Same analysis helper/stage instances as the overview; no automatic tips/scores |
+| [combined overview](../examples/color_dart_pipeline_overview.ipynb) | All implemented color stages, plus final-output-only batch inspection | Preparation/orientation/segmentation figures and timings in one notebook; future stages remain explicitly absent |
 | [recognition notebook](../examples/dart_recognition.ipynb) | Staged single-image orchestration, configuration, plotting, scoring, optional export | Defaults to classical boxes with session reuse keyed by settings/calibration; OWLv2 remains an optional library alternative; number and tip slots remain unset |
 
 ## Runtime and data flow
@@ -65,13 +70,18 @@ The color-based multi-dart pipeline is a separate library entry point, not an
 extension of the earlier `DartboardDartRecognitionPipeline` skeleton. It accepts
 one in-memory BGR image, detects and normalizes the board, then invokes injected
 orientation, segmentation, entry-point, and scoring stages. Those injections
-are required; an explicit-template orientation implementation is available, but
-segmentation, entry-point localization and new scoring remain unimplemented.
+are required; explicit-template orientation and initial board-color segmentation
+implementations are available, but entry-point localization and new scoring remain unimplemented.
 The pipeline does not fabricate results for them.
 `prepare_board()` runs only the shared localization/normalization prefix and
 returns a `BoardPreparationResult`, so these stages can be inspected independently.
 The complete pipeline calls the same function rather than maintaining a second
 execution path. Expected failures retain completed steps and skip dependents.
+`analyze_board_colors()` extends this inspectable prefix through the same
+orientation/segmentation stage contracts, returning actual maps without requiring
+dummy entry/scoring injections. Both new notebooks use it for detailed and batch
+runs. It preserves an uncertain orientation estimate rather than silently promote
+the result to confidence.
 
 ## Contracts and invariants
 
@@ -96,6 +106,10 @@ execution path. Expected failures retain completed steps and skip dependents.
   `partial(normalize_board_view, number_ring_radius_mm=240.0)` as the injected
   normalizer. It uses the same output size but a wider physical extent, without
   changing any scoring-view image/mask/transform. The default does no extra warp.
+  Normalization also returns scoring-view `source_coverage`, separate from the
+  nominal board disk. Missing source pixels must not train color models or become
+  dart evidence. Color modeling fails explicitly for injected legacy views without
+  source coverage rather than assume their black padding is observed board.
   Inspection overlays show nominal rings/spokes, not detected wires or numbered
   sector identities. Timing summaries sum stage execution durations and exclude
   file loading, artifact snapshot copies, and visualization.
@@ -125,7 +139,7 @@ execution path. Expected failures retain completed steps and skip dependents.
 
 ### Agreed color-based multi-dart design
 
-**Status recorded 2026-10-25:** milestones 1, 2 and 3 are implemented. Everything
+**Status recorded 2026-10-25:** milestones 1 through 4 are implemented. Everything
 marked planned below is a design commitment, not an available recognition
 algorithm. Develop and inspect one module at a time rather than deliver the
 entire recognizer in one change.
@@ -150,7 +164,7 @@ PDF's bull-dependent board-localization approach: reuse `detect_board()` instead
 | Board localization | Implemented | Replaceable `detect_board_stage()` adapter to `detect_board()`; board-model millimetres map to original-image pixels. It supplies geometry, not a physical wire segmentation. |
 | Normalization | Implemented | `normalize_board_view()` retains transforms and a nominal board mask; configurable square output, default 1024 px across the scoring board. Optional wider number-ring view retains source coverage; original-image access remains available. |
 | Numbered-sector orientation | Implemented initial template matcher; injected stage required | `Printed20OrientationStage(template)` identifies the printed `20` after perspective correction. Explicit board-style template, best alignment, heuristic match strength and trustworthy/uncertain flag. Weak/cropped/obscured evidence can fail or return an uncertain, potentially wrong best guess. |
-| Board-color modeling and dart segmentation | Planned; injected stage required | Derive field masks from board geometry/alignment, fit four robust per-image color distributions, exclude expected wires, and produce a normalized-board dart-likelihood map. |
+| Board-color modeling and dart segmentation | Implemented initial model; injected stage required | `RobustBoardColorSegmentationStage` derives field interiors, fits four robust per-image color distributions, excludes expected wires, and produces a heuristic normalized-board dart-likelihood map. Not a validated dart classifier. |
 | Board-entry-point localization | Planned; injected stage required | Separate non-overlapping entry points even if dart bodies form merged blobs. Return estimates in original-image pixels with confidence/provenance, not box centers. |
 | Scoring | Planned; injected stage required | Independently map board-entry points to sector/ring/points; preserve best guesses and explicit uncertainty. Existing scoring helpers are not the new implementation. |
 
@@ -221,9 +235,32 @@ Expose which label supported the estimate in diagnostics and cover full/partial
 fields of the corresponding color, giving four per-image distributions, not one
 model over all board pixels or separate distributions for every field. Apply
 the expected field-color model in that field. Exclude wire margins and robustly
-reject contaminated samples such as darts. How to fit distributions, handle
-low sample support, model HSV hue wrapping/features, and set outlier thresholds
-is not yet implemented or fixed by the interview.
+reject contaminated samples such as darts.
+
+Milestone 4 implements `build_field_masks()` in model millimetres, using
+`angle_from_20 = model_clockwise_angle + orientation.correction_deg`.
+Sector 20 has black single fields and red colored rings; alternating sectors,
+the red inner bull and green outer bull determine the four expected classes.
+Sample interiors exclude a configurable 2.5 mm margin around nominal radial
+and circular wires, plus missing source pixels. Models pool all interiors of
+the same color; they are not fitted independently to each wedge.
+
+`board_color_features()` maps OpenCV HSV to
+`[s*v*cos(h), s*v*sin(h), v]` with s/v in [0,1] and h wrapped continuously.
+Hue contributes little for dark/achromatic pixels. Each color uses at most
+12000 deterministic, evenly selected interior samples, a coordinatewise median,
+MAD scales multiplied by 1.4826, and three rounds of joint-distance trimming at
+4.5 robust units. Scale floors are [0.025, 0.025, 0.05]. At least 64 retained
+samples per color are required by default; missing support is an explicit
+`InsufficientColorSamples` stage failure. Unexpected exceptions propagate.
+These provisional choices assume dart contamination is a minority of each
+pooled class; they do not solve severe illumination gradients or majority
+occlusion. Centers, scales, and sampled/retained counts are diagnostic arrays.
+
+For each observed pixel, compare only its expected field-color model. Raw
+anomaly strength is `clip((robust_distance - 3) / 5, 0, 1)`, not a calibrated
+dart probability. Expected color IDs are red=0, green=1, beige=2, black=3,
+outside/unobserved=255. The returned `DartLikelihoodMap` remains float32 in [0,1].
 
 **Metal suppression:** start with geometry-derived expected wire regions plus
 edge/small-component cleanup; keep this replaceable inside segmentation.
@@ -234,6 +271,18 @@ and local regrowth, minimum-component filtering, hole filling, and optional
 GrabCut refinement. These are candidate internal operations, not a requirement
 to run every operation or expose each as a top-level pipeline stage.
 Expose internal named artifacts/substep timings as those operations are added.
+
+Milestone 4's default `suppress_wire_artifacts()` zeros a 1 mm band around nominal
+wires, opens >=0.5 anomaly support with a 3x3 ellipse, and retains components
+of at least 3 mm² (converted to pixels at the model origin). Inject an alternative
+`cleanup` callable into the segmentation stage to replace this policy. It can
+remove thin shafts and contact evidence, and residual reflections remain on the
+inspected real photo. Preserve `raw_color_anomalies` for subsequent tip work;
+do not treat cleaned components as separate darts or infer their contact points.
+`plot_color_segmentation()` shows expected colors, sampling masks, expected
+wires, raw/cleaned maps and the final overlay. Internal timings separately cover
+mask/features, fitting, anomaly evaluation and cleanup. Uncertain orientation
+is retained on the analysis result and prominently labeled in figures/batches.
 
 **Board-entry and score semantics:**
 
@@ -302,12 +351,39 @@ success-shaped placeholders.
    when real downstream stages become available.
    **Outstanding orientation follow-up:** implement the `5`/`1` fallback above
    for a fully or partially dart-covered `20`.
-5. **Next milestone:** implement geometry-derived field-interior masks, same-color sampling, robust
-   color models, and dart-likelihood segmentation. Keep wire/metal cleanup
-   replaceable and expose its internal diagnostic/timing evidence.
-6. Then implement entry-point localization and independent scoring incrementally.
+5. **Milestone 4, done:** geometry-derived field-interior masks, same-color
+   sampling, robust color models and an initial dart-likelihood map with
+   replaceable cleanup. Open
+   [color_dart_segmentation_inspection.ipynb](../examples/color_dart_segmentation_inspection.ipynb)
+   for detailed mask/model/map inspection, or
+   [color_dart_pipeline_overview.ipynb](../examples/color_dart_pipeline_overview.ipynb)
+   for all implemented color stages in one place. Both run the explicit reference
+   setup once, then `analyze_board_colors()` on a selected photo. No real tip or
+   independent scoring stage is supplied yet.
+6. **Next milestone:** entry-point localization, then independent scoring incrementally.
    Their algorithm details remain open; apply the agreed uncertainty, miss,
    ordering, and aggregate contracts rather than inventing new semantics.
+
+Every existing feature notebook, including the older experiments, now has a
+separate **Compact batch** cell with `RUN_BATCH=False` by default. Choose
+`BATCH_PATHS` (three photos by default; remove `[:3]` for the directory) and enable
+it to inspect only final outputs. Pages contain at most six downsized thumbnails
+with filename/status/elapsed processing time, so full-resolution intermediate
+histories are not retained per image. To investigate, copy a bad filename into
+that notebook's single-image selection. Color notebooks reuse the configured
+stage objects; the legacy recipes expose explicit `BATCH_*` settings that must
+match the detailed settings for a fair comparison. Batch times include callback
+I/O and rendering preparation; they are not pure algorithm timings.
+
+Special cases: the visualization notebook batches render sizes, not photos.
+The `find_single_dart.ipynb` scratch notebook batches its supported board stage,
+not its incomplete unrelated experimental cells. The raw-board-difference
+batch uses a separately calibrated fixed reference and its final binary
+candidate recipe. The scorer notebook batches the older prototype, with temporary
+annotated images cleaned up, not the new color scorer. Classical-recognition
+batching uses the default local backend, without optional model downloads or
+transferring manual points between images. Expected read/detection failures
+remain visible; unexpected programming errors are not swallowed.
 
 The small [orientation manifest](../data/annotations/color_dart_orientation.json)
 records one template reference, two visible-label checks with approximate
@@ -376,6 +452,12 @@ run and downsizes display previews, not processing inputs.
   wiring and non-mutating headless visualization. Three annotated same-board
   photo checks run when the optional DVC-managed inputs are present; otherwise
   that test skips.
+- [Segmentation tests](../tests/test_color_dart_segmentation.py) cover signed field
+  assignments, bull/ring masks, hue continuity, robust minority-contamination
+  rejection, missing-source exclusion, wire/component cleanup replacement,
+  explicit sample failures and partial-prefix orchestration.
+- [Batch tests](../tests/test_notebook_batch.py) cover bounded lazy pages, BGR/RGB
+  thumbnail conversion, visible failures and propagation of unexpected bugs.
 - Run `uv run --group dev pytest`; use one explicitly selected real image for a
   visual check unless a batch evaluation is requested.
 - Synthetic tests and diagnostic fit residuals do not establish real-dataset
@@ -417,8 +499,22 @@ to match at the default 1024 px normalization, excluding reference preparation,
 board detection, I/O and rendering. These are development observations, not
 latency guarantees or broad orientation accuracy measurements.
 
-No accuracy claims for segmentation, entry-point localization, or new scoring
-follow from these checks: those algorithms remain unimplemented.
+For milestone 4, both new detailed notebooks and all existing feature batch
+cells were executed headlessly. Each photo batch used the first two available
+inputs in its selected directory; the renderer batch used its three sizes.
+One real segmentation figure on `PXL_20261018_154237729.jpg` was rendered and
+inspected: darts are prominent, but wire residuals remain. On that photo,
+segmentation took approximately 120 ms at 1024 px in exploratory runs; this
+excludes board detection, reference setup, file I/O and display. No segmentation
+ground-truth masks have been annotated, so this is not an accuracy benchmark.
+The repository suite passed **122 tests, 1 skipped**:
+
+```bash
+uv run --group dev pytest -q
+```
+
+No accuracy claims for entry-point localization or new scoring follow from
+these checks: those algorithms remain unimplemented.
 Benchmark stage execution with diagnostics off and repeated representative
 inputs before choosing a latency target. Compare geometric quality as well as
 runtime; fast, successful execution is not sufficient evidence of correctness.

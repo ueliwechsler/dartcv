@@ -111,8 +111,39 @@ as the normalizer to supply its input. Its clockwise correction is relative to
 the rectified model; uncertain guesses remain explicit and absent evidence fails.
 The template, annular radii and thresholds are provisional and board-style
 dependent. The tiny [annotation manifest](data/annotations/color_dart_orientation.json)
-is for inspected same-board examples, not a dataset accuracy claim. Dart
-segmentation, entry-point localization and new scoring are still unimplemented.
+is for inspected same-board examples, not a dataset accuracy claim. Orientation
+remains provisional; entry-point localization and new scoring are unimplemented.
+
+## Color-pipeline overview and image batches
+
+Start with [the combined pipeline overview](examples/color_dart_pipeline_overview.ipynb)
+to see every implemented color-pipeline stage in one place. It covers board
+preparation, printed-20 orientation, field sampling, four robust board-color
+models, and an initial dart-likelihood map. For detailed color-stage investigation,
+use [the segmentation notebook](examples/color_dart_segmentation_inspection.ipynb).
+Entry-point localization and independent scoring are not implemented yet.
+
+Every feature notebook now has a **Compact batch** section. Set `RUN_BATCH = True`
+and edit `BATCH_PATHS` (three images by default; remove `[:3]` for the directory).
+Only final outputs appear, in six-image pages with filenames, status and elapsed
+time. Copy a bad filename into the single-image selection to inspect intermediates.
+Run the color notebooks' explicit reference-template setup once before batching.
+Legacy batch cells have explicit `BATCH_*` settings; match them to the detailed
+settings when comparing results. Existing single-image cells and saved outputs
+are preserved.
+
+The visualization-only notebook batches render sizes instead of photographs.
+The old `find_single_dart.ipynb` scratch notebook batches its supported
+board-detection section, not its incomplete unrelated experiments. Batch scoring
+in `dart_scorer_pipeline.ipynb` uses the older scorer prototype, not the new color
+pipeline. Expected read/detection failures are shown rather than silently skipped.
+
+`RobustBoardColorSegmentationStage` fits per-image field-interior distributions
+in hue-wrapping HSV-cone coordinates, then suppresses nominal wire bands and small
+components. Cleanup is replaceable; raw anomalies and model support remain
+inspectable. The map is heuristic: reflections can remain, thin shafts can be
+removed, and uncertain orientation can spoil field assignments. No blob is
+automatically declared a dart or assigned a score.
 
 ## Dart recognition notebook
 
