@@ -10,6 +10,21 @@ Open the printed `http://127.0.0.1:8765` address. The editor serves only local
 files over loopback; no images or labels are uploaded. Stop with Ctrl-C.
 No additional dependencies or model downloads are needed.
 
+Choose **Folder**, then a photograph, then a dart within that photograph.
+By default folders are discovered directly beneath `data/images`, starting
+with `multi_dart`. Previous/Next and unfinished navigation stay within the
+selected folder. Changing folders warns before discarding unsaved edits.
+Only discovered folders under the configured image root can be selected.
+`--images` also accepts a single folder containing photos.
+
+Existing multi-dart labels stay in `data/annotations/darts/`; other datasets
+use a subdirectory such as `data/annotations/darts/single_dart/` to avoid
+filename collisions. When `--images` points directly to a photo folder, its
+labels go directly in `--annotations`, preserving the original workflow.
+If an image root itself contains photos as well as child folders, its own
+photos appear as "Selected image folder" and all children use label subdirectories.
+For evaluation of another dataset, set the notebook's `LABEL_DIR` accordingly.
+
 To choose another local dataset or output directory:
 
 ```bash

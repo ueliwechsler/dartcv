@@ -7,7 +7,7 @@
     history: null, saved: "", revision: null, token: null, photos: [], index: -1,
     dart: 0, region: -1, image: null, scale: 1, x: 0, y: 0,
     mode: "edit", pending: [], layer: null, pendingDart: null,
-    drag: null, space: false, busy: false
+    drag: null, space: false, busy: false, folder: "."
   };
   const colors = {
     flight: "#53cfff", shaft_barrel: "#ffbd59", uncertain: "#7bf586",
@@ -23,6 +23,9 @@
     $("message").className = error ? "error" : "";
   }
   async function api(path, options = {}) {
+    if (path.startsWith("/api/annotation") || path.startsWith("/api/images")) {
+      path += (path.includes("?") ? "&" : "?") + "folder=" + encodeURIComponent(state.folder);
+    }
     const response = await fetch(path, options);
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || `Request failed (${response.status}).`);
@@ -99,7 +102,7 @@
     try {
       const result = await api(`/api/annotation?name=${encodeURIComponent(name)}`);
       const image = new Image();
-      image.src = `/api/pixels?name=${encodeURIComponent(name)}`;
+      image.src = `/api/pixels?name=${encodeURIComponent(name)}&folder=${encodeURIComponent(state.folder)}`;
       await image.decode();
       if (image.naturalWidth !== result.annotation.width || image.naturalHeight !== result.annotation.height) {
         throw new Error("Displayed photograph dimensions do not match the annotation.");
@@ -387,6 +390,25 @@
     message("Downloaded a copy; this does not mark the server file saved.");
   });
   $("photos").addEventListener("change", run(event => load(Number(event.target.value))));
+  $("folders").addEventListener("change", run(async event => {
+    const folder = event.target.value;
+    if (!leaveAllowed()) { event.target.value = state.folder; return; }
+    const previousFolder = state.folder, previousPhotos = state.photos;
+    state.busy = true;
+    try {
+      state.folder = folder;
+      state.photos = await api("/api/images");
+      if (!state.photos.length) throw new Error("This folder has no photographs.");
+      $("photos").replaceChildren(...state.photos.map((photo, index) => option(index, `${photo.name} [${photo.status}]`)));
+      await load(0, false);
+    } catch (error) {
+      state.folder = previousFolder; state.photos = previousPhotos;
+      $("folders").value = previousFolder;
+      $("photos").replaceChildren(...previousPhotos.map((photo, index) => option(index, `${photo.name} [${photo.status}]`)));
+      $("photos").value = state.index;
+      throw error;
+    } finally { state.busy = false; }
+  }));
   $("darts").addEventListener("change", run(event => {
     requireNoDrawing(); state.dart = Number(event.target.value); state.region = -1; state.mode = "edit"; refresh();
   }));
@@ -430,6 +452,7 @@
   window.addEventListener("beforeunload", event => { if (dirty()) { event.preventDefault(); event.returnValue = ""; } });
   new ResizeObserver(render).observe($("viewport"));
   const help = {
+    folders: "Choose an image folder first, then a photograph, then a dart within it. Unsaved edits trigger a discard warning.",
     photos: "Select a local photograph. Unsaved edits trigger a discard warning.",
     previous: "Open the previous photograph; save first to keep your changes.",
     next: "Open the next photograph; save first to keep your changes.",
@@ -474,6 +497,10 @@
   }
   async function start() {
     state.token = (await api("/api/session")).token;
+    const folders = await api("/api/folders");
+    state.folder = folders.default;
+    $("folders").replaceChildren(...folders.folders.map(name => option(name, name === "." ? "Selected image folder" : name)));
+    $("folders").value = state.folder;
     state.photos = await api("/api/images");
     $("photos").replaceChildren(...state.photos.map((photo, index) => option(index, `${photo.name} [${photo.status}]`)));
     if (!state.photos.length) throw new Error("No supported photographs found.");

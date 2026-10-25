@@ -714,6 +714,16 @@ include scores. Controls have native hover descriptions and focusable `?`
 context-help boxes, including explicit guidance that shaft/barrel polygons include
 the visible metal tip while the exact point records its endpoint.
 
+The default image root is `data/images`; a fixed allowlist of direct image
+subfolders drives Folder -> Photograph -> Dart selection. A photo-containing
+root is also selectable. Every folder has a separate `AnnotationStore`, with
+folder-qualified API requests for listing, loading, pixels and saves; unsaved
+changes are confirmed before switching. Existing multi-dart labels retain
+their flat location, while other child datasets use output subdirectories to
+avoid same-filename collisions. Supplying a single photo folder via `--images`
+keeps the original flat-output behavior. Arbitrary browser-supplied paths are
+not accepted.
+
 Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
 part; optional complete inferred silhouettes are separate. A physical tip is
 exact or hidden/unknown; embedded/not-embedded/unknown contact determines

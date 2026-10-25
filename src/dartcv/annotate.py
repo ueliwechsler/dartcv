@@ -140,7 +140,37 @@ class AnnotationStore:
         return {"revision": sha256(content).hexdigest(), "status": annotation.status}
 
 
-def make_server(store: AnnotationStore, port: int = 8765) -> ThreadingHTTPServer:
+class AnnotationFolders:
+    """Fixed folder allowlist; browser requests cannot select arbitrary paths."""
+
+    def __init__(self, image_root: Path, output_root: Path):
+        image_root = image_root.resolve(strict=True)
+        directories = [image_root] if any(
+            p.is_file() and p.suffix.lower() in SUFFIXES for p in image_root.iterdir()
+        ) else []
+        directories.extend(
+            p for p in sorted(image_root.iterdir()) if p.is_dir() and not p.is_symlink()
+            and any(child.is_file() and not child.is_symlink() and child.suffix.lower() in SUFFIXES for child in p.iterdir())
+        )
+        self.stores = {}
+        for directory in directories:
+            name = "." if directory == image_root else directory.name
+            # Preserve the original multi-dart label location.
+            output = output_root if name == "." or (
+                name == "multi_dart" and image_root not in directories
+            ) else output_root / name
+            self.stores[name] = AnnotationStore(directory, output)
+        if not self.stores:
+            raise ValueError(f"No supported image folders in {image_root}. Restore the local DVC images first.")
+        self.default = "multi_dart" if "multi_dart" in self.stores else next(iter(self.stores))
+
+    def select(self, name):
+        if name not in self.stores:
+            raise ValueError("Unknown image folder.")
+        return self.stores[name]
+
+
+def make_server(store: AnnotationStore | AnnotationFolders, port: int = 8765) -> ThreadingHTTPServer:
     token = secrets.token_urlsafe(32)
 
     class Handler(BaseHTTPRequestHandler):
@@ -180,6 +210,8 @@ def make_server(store: AnnotationStore, port: int = 8765) -> ThreadingHTTPServer
             params = parse_qs(parsed.query)
             name = params.get("name", [""])[0]
             try:
+                folder = params.get("folder", [store.default if isinstance(store, AnnotationFolders) else "."])[0]
+                selected_store = store.select(folder) if isinstance(store, AnnotationFolders) else store
                 if post:
                     if parsed.path != "/api/annotation":
                         self._send(404, {"error": "Unknown endpoint."})
@@ -196,15 +228,20 @@ def make_server(store: AnnotationStore, port: int = 8765) -> ThreadingHTTPServer
                     payload = json.loads(self.rfile.read(length))
                     if not isinstance(payload, dict) or set(payload) != {"annotation", "revision"}:
                         raise ValueError("Save requires annotation and revision.")
-                    self._send(200, store.save(name, payload["annotation"], payload["revision"]))
+                    self._send(200, selected_store.save(name, payload["annotation"], payload["revision"]))
                 elif parsed.path == "/api/session":
                     self._send(200, {"token": token})
+                elif parsed.path == "/api/folders":
+                    self._send(200, {
+                        "folders": list(store.stores) if isinstance(store, AnnotationFolders) else ["."],
+                        "default": store.default if isinstance(store, AnnotationFolders) else ".",
+                    })
                 elif parsed.path == "/api/images":
-                    self._send(200, store.listing())
+                    self._send(200, selected_store.listing())
                 elif parsed.path == "/api/annotation":
-                    self._send(200, store.load(name))
+                    self._send(200, selected_store.load(name))
                 elif parsed.path == "/api/pixels":
-                    self._send(200, store.photo(name)["pixels"], "image/jpeg")
+                    self._send(200, selected_store.photo(name)["pixels"], "image/jpeg")
                 elif parsed.path in ("/", "/app.js", "/editor.js", "/style.css"):
                     filename, content_type = {
                         "/": ("index.html", "text/html; charset=utf-8"),
@@ -236,17 +273,17 @@ def make_server(store: AnnotationStore, port: int = 8765) -> ThreadingHTTPServer
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--images", type=Path, default=Path("data/images/multi_dart"))
+    parser.add_argument("--images", type=Path, default=Path("data/images"))
     parser.add_argument("--annotations", type=Path, default=Path("data/annotations/darts"))
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args(argv)
     try:
-        store = AnnotationStore(args.images, args.annotations)
+        store = AnnotationFolders(args.images, args.annotations)
         server = make_server(store, args.port)
     except (ValueError, OSError) as exc:
         parser.exit(2, f"Cannot start annotation editor: {exc}\n")
     print(f"Open http://127.0.0.1:{server.server_port} (local only; Ctrl-C to stop).", flush=True)
-    print(f"Photographs: {store.image_dir}\nLabels: {store.output_dir}", flush=True)
+    print(f"Image folders: {args.images.resolve()}\nLabels: {args.annotations.resolve()}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

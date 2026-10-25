@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import pytest
 
-from dartcv.annotate import AnnotationStore, SaveConflict, make_server
+from dartcv.annotate import AnnotationFolders, AnnotationStore, SaveConflict, make_server
 
 
 @pytest.fixture
@@ -65,6 +65,44 @@ def test_changed_or_corrupt_inputs_never_load_as_clean_drafts(store):
     path.write_text("{bad JSON")
     with pytest.raises(ValueError):
         store.load("one.jpg")
+
+
+def test_folder_selection_keeps_same_named_images_and_labels_separate(tmp_path):
+    root = tmp_path / "images"
+    for folder, value in (("multi_dart", 100), ("single_dart", 150)):
+        directory = root / folder
+        directory.mkdir(parents=True)
+        cv2.imwrite(str(directory / "one.jpg"), np.full((30, 40, 3), value, np.uint8))
+    folders = AnnotationFolders(root, tmp_path / "labels")
+    assert folders.default == "multi_dart"
+    multi = folders.select("multi_dart")
+    single = folders.select("single_dart")
+    annotation = completed(multi)
+    multi.save("one.jpg", annotation, None)
+    assert single.load("one.jpg")["revision"] is None
+    assert single.load("one.jpg")["annotation"]["sha256"] != annotation["sha256"]
+    single.save("one.jpg", completed(single), None)
+    assert (tmp_path / "labels/one.jpg.json").is_file()
+    assert (tmp_path / "labels/single_dart/one.jpg.json").is_file()
+    with pytest.raises(ValueError, match="Unknown image folder"):
+        folders.select("../elsewhere")
+    server = make_server(folders, 0)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(base + "/api/folders", timeout=5) as response:
+            assert json.load(response) == {"folders": ["multi_dart", "single_dart"], "default": "multi_dart"}
+        for folder in folders.stores:
+            with urlopen(base + f"/api/annotation?folder={folder}&name=one.jpg", timeout=5) as response:
+                assert json.load(response)["annotation"]["sha256"] == folders.select(folder).photo("one.jpg")["sha256"]
+        with pytest.raises(HTTPError) as invalid:
+            urlopen(base + "/api/images?folder=../elsewhere", timeout=5)
+        assert invalid.value.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_local_http_load_save_and_origin_guards(store):
