@@ -36,6 +36,12 @@ uv run python -m dartcv.annotate --images data/images/multi_dart \
    **embedded**, **not embedded**, or **unknown**. A physical tip is a board
    entry point only when embedded. A dart outside the scoring area is still
    annotated; a dart entirely outside the photo is not.
+   Include the visible metal tip in its shaft/barrel polygon as well: the
+   polygon labels visible pixels; the exact point labels its endpoint.
+   Optionally choose a **score number** and **single/double/triple** (single
+   by default). The number is the sector, not multiplied points: 20 + triple
+   means 60. Choose 25 + single for outer bull, 25 + double for inner bull,
+   or Miss (0) for a miss. Leave Not labeled / unknown when unsure.
 5. Mark an **ignore** polygon where dart/background identity is genuinely
    ambiguous, such as blur or an indistinguishable overlap boundary. Use this
    sparingly: uncertainty about *which dart part* is present still belongs in
@@ -56,6 +62,8 @@ dart. No exact-three or on-board-only assumption is made.
 
 - Wheel or Zoom +/- to zoom; Fit Image resets the view. Hold Space and drag, or
   use the middle mouse button, to pan. Coordinates remain at original resolution.
+- Hover a control for its native tooltip, or hover/focus the adjacent **?**
+  badge for a contextual help box. Keyboard users can Tab to the badges.
 - Select a polygon in the list, then drag vertices. Double-click an edge to add
   a vertex; right-click a vertex to remove it. Right-click during drawing removes
   the most recent point. Delete selected polygon removes an entire region.
@@ -84,6 +92,7 @@ extension to avoid collisions. `schema_version: 1` contains:
 | `darts[].silhouette[]` | Optional complete inferred polygons, distinct from observations |
 | `darts[].tip_status`, `tip` | `exact` with `[x,y]`, or `unknown` with `null` |
 | `darts[].contact` | `embedded`, `not_embedded`, `unknown` |
+| `darts[].score` | Optional `null` or `{number, multiplier}`; number 0, 1-20, or 25; multiplier `single` (default), `double`, `triple` |
 | `ignore[]` | Ambiguous polygons excluded from visible-mask evaluation |
 
 Every polygon is an ordered array of source-photo `[x,y]` vertices, origin at
@@ -101,6 +110,13 @@ orientation. The existing normalized sparse-probe manifest is retained as a
 separate development fixture; it is not converted into complete outlines.
 Store only small JSON labels in git, not source images; no automatic commits
 are made when annotating.
+
+Existing schema-version-1 files without `score` remain readable and are treated
+as unlabeled scores. A score is optional even for completed photos, is entered
+manually, and is never inferred from the tip or contact status. Only single is
+valid for a miss; bull permits single/double, not triple. The GUI shows the
+derived points without storing a redundant total. Score edits support undo/redo
+and save/resume independently for each dart. Segmentation metrics ignore scores.
 
 ## Evaluating the color algorithm
 

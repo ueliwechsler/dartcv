@@ -28,6 +28,16 @@ class VisibleRegion:
 
 
 @dataclass(frozen=True)
+class AnnotatedScore:
+    number: int
+    multiplier: Literal["single", "double", "triple"] = "single"
+
+    @property
+    def points(self) -> int:
+        return self.number * {"single": 1, "double": 2, "triple": 3}[self.multiplier]
+
+
+@dataclass(frozen=True)
 class AnnotatedDart:
     id: str
     visible: tuple[VisibleRegion, ...]
@@ -35,6 +45,7 @@ class AnnotatedDart:
     tip_status: Literal["exact", "unknown"]
     tip: Point | None
     contact: Literal["embedded", "not_embedded", "unknown"]
+    score: AnnotatedScore | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +77,10 @@ class ImageAnnotation:
                     "tip_status": dart.tip_status,
                     "tip": list(dart.tip) if dart.tip is not None else None,
                     "contact": dart.contact,
+                    "score": (
+                        {"number": dart.score.number, "multiplier": dart.score.multiplier}
+                        if dart.score is not None else None
+                    ),
                 }
                 for dart in self.darts
             ],
@@ -150,9 +165,10 @@ def parse_annotation(data: object) -> ImageAnnotation:
     darts = []
     ids = set()
     for item in data["darts"]:
-        if not isinstance(item, dict) or set(item) != {
+        dart_fields = {
             "id", "visible", "silhouette", "tip_status", "tip", "contact",
-        }:
+        }
+        if not isinstance(item, dict) or set(item) not in (dart_fields, dart_fields | {"score"}):
             raise ValueError("Each dart needs id, visible, silhouette, tip_status, tip and contact.")
         dart_id = item["id"]
         if not isinstance(dart_id, str) or not dart_id.strip() or dart_id in ids:
@@ -175,9 +191,25 @@ def parse_annotation(data: object) -> ImageAnnotation:
             raise ValueError("An unknown tip must have null coordinates.")
         if item["contact"] not in ("embedded", "not_embedded", "unknown"):
             raise ValueError("Contact must be embedded, not_embedded or unknown.")
+        score = None
+        score_data = item.get("score")
+        if score_data is not None:
+            if not isinstance(score_data, dict) or set(score_data) not in (
+                {"number"}, {"number", "multiplier"},
+            ):
+                raise ValueError("Score requires number and optional multiplier.")
+            number = score_data["number"]
+            multiplier = score_data.get("multiplier", "single")
+            if type(number) is not int or number not in (0, *range(1, 21), 25):
+                raise ValueError("Score number must be 0 (miss), 1-20, or 25 (bull).")
+            if multiplier not in ("single", "double", "triple"):
+                raise ValueError("Score multiplier must be single, double or triple.")
+            if (number == 0 and multiplier != "single") or (number == 25 and multiplier == "triple"):
+                raise ValueError("A miss must be single; bull allows single (25) or double (50), not triple.")
+            score = AnnotatedScore(number, multiplier)
         darts.append(AnnotatedDart(
             dart_id, tuple(visible), polygons(item["silhouette"]),
-            tip_status, tip, item["contact"],
+            tip_status, tip, item["contact"], score,
         ))
     return ImageAnnotation(
         image, width, height, fingerprint, data["status"],

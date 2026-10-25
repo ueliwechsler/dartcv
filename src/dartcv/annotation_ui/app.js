@@ -56,6 +56,15 @@
     const dart = activeDart();
     $("contact").disabled = !dart;
     $("contact").value = dart ? dart.contact : "unknown";
+    const score = dart?.score;
+    $("score-number").disabled = !dart;
+    $("score-number").value = score ? String(score.number) : "";
+    $("score-multiplier").disabled = !dart || !score || score.number === 0;
+    $("score-multiplier").value = score?.multiplier || "single";
+    $("score-multiplier").querySelector('[value="triple"]').disabled = score?.number === 25;
+    $("score-points").textContent = score
+      ? `Manual label: ${score.number * {single: 1, double: 2, triple: 3}[score.multiplier]} points`
+      : "Score not labeled (optional).";
     $("tip-status").textContent = !dart ? "No dart selected." : (
       dart.tip_status === "exact" ? `Exact tip: ${dart.tip.map(n => n.toFixed(1)).join(", ")}` : "Tip: hidden / unknown"
     );
@@ -335,7 +344,7 @@
     requireNoDrawing(); state.mode = "edit";
     mutate(next => {
       let i = 1; while (next.darts.some(d => d.id === `dart-${i}`)) i++;
-      next.darts.push({id: `dart-${i}`, visible: [], silhouette: [], tip_status: "unknown", tip: null, contact: "unknown"});
+      next.darts.push({id: `dart-${i}`, visible: [], silhouette: [], tip_status: "unknown", tip: null, contact: "unknown", score: null});
     });
     state.dart = doc().darts.length - 1; state.region = -1; refresh();
   });
@@ -385,6 +394,17 @@
     requireNoDrawing(); state.region = Number(event.target.value); state.mode = "edit"; refresh();
   }));
   $("contact").addEventListener("change", run(event => mutate(next => { next.darts[state.dart].contact = event.target.value; })));
+  $("score-number").append(option("", "Not labeled / unknown"), option("0", "Miss (0)"),
+    ...Array.from({length: 20}, (_, i) => option(String(i + 1), String(i + 1))),
+    option("25", "Bull (25; double = 50)"));
+  $("score-number").addEventListener("change", run(event => {
+    const number = event.target.value === "" ? null : Number(event.target.value);
+    // A newly chosen number starts at single rather than inheriting another dart/ring.
+    mutate(next => E.setScore(next.darts[state.dart], number));
+  }));
+  $("score-multiplier").addEventListener("change", run(event => {
+    mutate(next => E.setScore(next.darts[state.dart], activeDart().score.number, event.target.value));
+  }));
   $("status").addEventListener("change", run(event => {
     requireNoDrawing();
     const value = event.target.value;
@@ -409,6 +429,49 @@
   window.addEventListener("blur", () => { state.space = false; endDrag(true); });
   window.addEventListener("beforeunload", event => { if (dirty()) { event.preventDefault(); event.returnValue = ""; } });
   new ResizeObserver(render).observe($("viewport"));
+  const help = {
+    photos: "Select a local photograph. Unsaved edits trigger a discard warning.",
+    previous: "Open the previous photograph; save first to keep your changes.",
+    next: "Open the next photograph; save first to keep your changes.",
+    unfinished: "Jump to the next new or draft photograph.",
+    save: "Validate and save labels to disk. Draft work can be resumed later.",
+    "save-next": "Save this photograph, then open the next one.",
+    download: "Download a JSON copy. This does not save changes to the server.",
+    status: "Completed asserts that every visible dart is labeled. Unmarked pixels become background except ignore regions.",
+    darts: "Each dart has its own visible regions, optional silhouette, tip, contact and score.",
+    "add-dart": "Add another dart. Three is a convenience default, not a required count.",
+    "remove-dart": "Remove this dart and all its labels. Undo restores it.",
+    contact: "Embedded means the tip enters the board. Not embedded is a loose/missed dart. Choose unknown if unclear.",
+    tip: "Click the exact physical endpoint/contact location. Include visible metal tip pixels in the shaft/barrel polygon too.",
+    "unknown-tip": "No tip coordinate is saved. Use when the tip is hidden or cannot be identified; never guess.",
+    "score-number": "Optional human-labeled sector number, not total points. Leave unknown when unsure. Use 0 for a miss or 25 for bull.",
+    "score-multiplier": "Single is default. Double multiplies by 2; triple by 3. Bull: single 25 or double 50. Score is not inferred from the tip.",
+    layer: "Visible flight: fins. Shaft/barrel: body, shaft and visible metal tip. Uncertain part: definitely dart, part unclear. Inferred silhouette: includes hidden shape, not ground truth. Ignore: dart/background truly ambiguous.",
+    draw: "Click boundary vertices in order, then Enter or Finish. Separate disconnected visible pieces into multiple polygons.",
+    finish: "Close the polygon with at least three vertices. Self-crossing outlines are rejected on save.",
+    cancel: "Discard only the unfinished polygon; saved regions remain unchanged.",
+    regions: "Select a polygon to edit. Drag vertices, double-click an edge to insert, right-click a vertex to remove.",
+    copy: "Create an independent inferred silhouette from the selected visible region. Editing it leaves visible ground truth unchanged.",
+    delete: "Delete the selected polygon only, not the dart. Undo restores it.",
+    undo: "Undo the last label edit; while drawing, remove the last vertex.",
+    redo: "Restore an undone label edit. A new edit clears redo history.",
+    fit: "Fit the entire original photograph into the canvas without changing labels.",
+    "zoom-in": "Zoom in around the canvas center. The mouse wheel zooms around the pointer.",
+    "zoom-out": "Zoom out. Hold Space and drag or use the middle button to pan.",
+    "show-inferred": "Show/hide optional complete inferred silhouettes. They never count as visible segmentation truth.",
+  };
+  for (const [id, text] of Object.entries(help)) {
+    const control = $(id);
+    control.title = text;
+    const label = control.closest("label");
+    const badge = document.createElement("span");
+    badge.className = "context-help"; badge.tabIndex = 0;
+    badge.textContent = "?"; badge.setAttribute("aria-label", `Help: ${text}`);
+    const popup = document.createElement("span");
+    popup.className = "help-popup"; popup.textContent = text;
+    badge.append(popup);
+    if (label) label.append(badge); else control.after(badge);
+  }
   async function start() {
     state.token = (await api("/api/session")).token;
     state.photos = await api("/api/images");

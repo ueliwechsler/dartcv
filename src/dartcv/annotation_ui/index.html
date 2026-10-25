@@ -31,10 +31,17 @@
       </select></label>
       <div id="tip-status"></div>
       <div><button id="tip">Place exact tip</button> <button id="unknown-tip">Hidden / unknown</button></div>
+      <label>Optional score <select id="score-number" aria-label="Score number"></select></label>
+      <label>Scoring ring <select id="score-multiplier">
+        <option value="single">Single (default)</option>
+        <option value="double">Double</option>
+        <option value="triple">Triple</option>
+      </select></label>
+      <div id="score-points" aria-live="polite"></div>
       <hr>
       <label>New polygon <select id="layer">
         <option value="flight">Visible flight</option>
-        <option value="shaft_barrel">Visible shaft / barrel</option>
+        <option value="shaft_barrel">Visible shaft / barrel / metal tip</option>
         <option value="uncertain">Visible dart, uncertain part</option>
         <option value="silhouette">Complete inferred silhouette</option>
         <option value="ignore">Ignore ambiguous pixels</option>

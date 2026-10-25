@@ -64,6 +64,16 @@
     dart.tip_status = point === null ? "unknown" : "exact";
     dart.tip = point === null ? null : clone(point);
   }
+  function setScore(dart, number, multiplier = "single") {
+    if (number === null) { dart.score = null; return; }
+    if (![0, ...Array.from({length: 20}, (_, i) => i + 1), 25].includes(number)) {
+      throw new Error("Score number must be 0, 1-20, or 25.");
+    }
+    if (!["single", "double", "triple"].includes(multiplier) ||
+        (number === 0 && multiplier !== "single") ||
+        (number === 25 && multiplier === "triple")) throw new Error("Invalid scoring ring for this number.");
+    dart.score = {number, multiplier};
+  }
   function nearestEdge(points, point) {
     let result = {index: -1, distance: Infinity};
     points.forEach((a, index) => {
@@ -79,7 +89,7 @@
   function completeErrors(document) {
     return document.darts.flatMap(dart => dart.visible.length ? [] : [`${dart.id} needs a visible region (or remove this dart).`]);
   }
-  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, nearestEdge, completeErrors};
+  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, setScore, nearestEdge, completeErrors};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.DartEditor = api;
 })(typeof window === "undefined" ? globalThis : window);

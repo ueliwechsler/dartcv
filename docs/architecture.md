@@ -705,6 +705,15 @@ annotation ground truth and off-board evidence remains represented. Photographs
 are OpenCV-decoded for both display and pipeline, with decoded dimensions and
 file SHA-256 stored; annotation resume/evaluation rejects changed sources.
 
+Optional per-dart manual `score` labels store sector number and single/double/
+triple multiplier (default single). Missing/null scores remain unknown, preserving
+existing schema-version-1 files. Miss is 0/single; bull is 25/single or 25/double.
+Derived points are displayed, not duplicated on disk; score labels are independent
+of tip/contact and excluded from visible-mask metrics. Editor history and saves
+include scores. Controls have native hover descriptions and focusable `?`
+context-help boxes, including explicit guidance that shaft/barrel polygons include
+the visible metal tip while the exact point records its endpoint.
+
 Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
 part; optional complete inferred silhouettes are separate. A physical tip is
 exact or hidden/unknown; embedded/not-embedded/unknown contact determines

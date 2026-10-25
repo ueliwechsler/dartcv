@@ -102,7 +102,7 @@ class AnnotationStore:
                 "darts": [
                     {
                         "id": f"dart-{i}", "visible": [], "silhouette": [],
-                        "tip_status": "unknown", "tip": None, "contact": "unknown",
+                        "tip_status": "unknown", "tip": None, "contact": "unknown", "score": None,
                     }
                     for i in range(1, 4)
                 ],

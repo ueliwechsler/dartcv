@@ -117,6 +117,29 @@ def test_loading_labels_checks_source_identity(tmp_path):
         load_annotation(path, source_image=source)
 
 
+def test_optional_manual_score_defaults_and_old_labels_remain_readable():
+    data = labels()
+    assert parse_annotation(data).darts[0].score is None
+    data["darts"][0]["score"] = {"number": 20}
+    annotation = parse_annotation(data)
+    assert annotation.darts[0].score.multiplier == "single"
+    assert annotation.darts[0].score.points == 20
+    assert annotation.to_dict()["darts"][0]["score"] == {"number": 20, "multiplier": "single"}
+    for number, multiplier, points in [(20, "double", 40), (20, "triple", 60), (25, "single", 25), (25, "double", 50), (0, "single", 0)]:
+        data["darts"][0]["score"] = {"number": number, "multiplier": multiplier}
+        annotation = parse_annotation(data)
+        assert annotation.darts[0].score.points == points
+        assert parse_annotation(annotation.to_dict()) == annotation
+    for score in (
+        {"number": 21}, {"number": True}, {"number": 20, "multiplier": "quadruple"},
+        {"number": 25, "multiplier": "triple"}, {"number": 0, "multiplier": "double"},
+        {"number": 20, "points": 60},
+    ):
+        data["darts"][0]["score"] = score
+        with pytest.raises(ValueError, match="Score|miss"):
+            parse_annotation(data)
+
+
 @pytest.mark.parametrize("status", ["completed", "draft", "missing"])
 def test_comparison_notebook_consumes_saved_labels(tmp_path, capsys, status):
     root = Path(__file__).resolve().parents[1]
@@ -166,14 +189,23 @@ const points = [[1,1], [9,1], [5,8]];
 E.addPolygon(next, 0, 'silhouette', points);
 E.addPolygon(next, 0, 'ignore', points);
 E.setTip(next.darts[0], null);
+E.setScore(next.darts[0], 20);
+assert.deepEqual(next.darts[0].score, {number:20, multiplier:'single'});
+E.setScore(next.darts[0], 20, 'triple');
 history.commit(next);
 assert.equal(history.document.darts[0].visible.length, 2);
 assert.equal(history.document.darts[0].silhouette.length, 2);
 assert.equal(history.document.darts[0].tip_status, 'unknown');
+assert.deepEqual(history.document.darts[0].score, {number:20, multiplier:'triple'});
 history.undo();
 assert.deepEqual(history.document, initial);
 history.redo();
 assert.equal(history.document.darts[0].tip, null);
+assert.deepEqual(history.document.darts[0].score, {number:20, multiplier:'triple'});
+const scoreEdit = E.clone(history.document);
+E.setScore(scoreEdit.darts[0], null);
+assert.equal(scoreEdit.darts[0].score, null);
+assert.throws(() => E.setScore(scoreEdit.darts[0],25,'triple'));
 const selected = E.regions(history.document, 0)[0];
 const changed = E.clone(history.document);
 E.polygonPoints(changed, 0, selected)[0] = [11,11];

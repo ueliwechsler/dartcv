@@ -90,7 +90,8 @@ Optional batch/ablation switches remain off in this smoke check.
 Run `uv run python -m dartcv.annotate` and open `http://127.0.0.1:8765`.
 The local browser editor supports zoom/pan, per-dart editable polygons,
 flight/shaft labels, optional inferred outlines, exact/unknown tips, ignore
-regions, undo/redo, and save/resume. Images stay local and unchanged.
+regions, optional manual sector/ring scores (single by default), contextual
+hover help, undo/redo, and save/resume. Images stay local and unchanged.
 
 Follow [the annotation protocol](docs/dart-annotation.md). Save complete
 source-coordinate labels under `data/annotations/darts/`, then enable
