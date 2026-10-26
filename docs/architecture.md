@@ -718,10 +718,10 @@ The default image root is `data/images`; a fixed allowlist of direct image
 subfolders drives Folder -> Photograph -> Dart selection. A photo-containing
 root is also selectable. Every folder has a separate `AnnotationStore`, with
 folder-qualified API requests for listing, loading, pixels and saves; unsaved
-changes are confirmed before switching. Existing multi-dart labels retain
-their flat location, while other child datasets use output subdirectories to
-avoid same-filename collisions. Supplying a single photo folder via `--images`
-keeps the original flat-output behavior. Arbitrary browser-supplied paths are
+changes are confirmed before switching. All child datasets, including
+`multi_dart`, use matching output subdirectories to avoid same-filename
+collisions. Supplying a single photo folder via `--images` saves directly in
+the exact `--annotations` directory. Arbitrary browser-supplied paths are
 not accepted.
 
 Polygon validation permits crossing/self-touching edges and repeated vertices,
@@ -745,7 +745,7 @@ Each dart has visible polygons classified as flight, shaft/barrel, or uncertain
 part; optional complete inferred silhouettes are separate. A physical tip is
 exact or hidden/unknown; embedded/not-embedded/unknown contact determines
 whether it is a board entry point. Ignore polygons identify genuinely
-ambiguous foreground. Draft/completed is explicit, with per-dart visible-region
+ambiguous foreground. Draft/AI-draft/completed is explicit, with per-dart visible-region
 checks and a human assertion of exhaustive labeling at completion.
 
 The browser implements polygon/vertex editing, zoom/pan, per-dart grouping,

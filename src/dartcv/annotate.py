@@ -155,10 +155,7 @@ class AnnotationFolders:
         self.stores = {}
         for directory in directories:
             name = "." if directory == image_root else directory.name
-            # Preserve the original multi-dart label location.
-            output = output_root if name == "." or (
-                name == "multi_dart" and image_root not in directories
-            ) else output_root / name
+            output = output_root if name == "." else output_root / name
             self.stores[name] = AnnotationStore(directory, output)
         if not self.stores:
             raise ValueError(f"No supported image folders in {image_root}. Restore the local DVC images first.")

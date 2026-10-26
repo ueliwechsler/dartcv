@@ -87,6 +87,16 @@
     });
     return result;
   }
+  function addVertex(points, point, tolerance) {
+    const edge = nearestEdge(points, point);
+    if (edge.distance > tolerance) throw new Error("Click an edge of the selected polygon to add a vertex.");
+    points.splice(edge.index + 1, 0, clone(point));
+  }
+  function removeVertex(points, index) {
+    if (index < 0 || index >= points.length) throw new Error("Click a vertex of the selected polygon to remove it.");
+    if (points.length <= 3) throw new Error("A polygon needs three vertices. Delete the polygon instead.");
+    points.splice(index, 1);
+  }
   function completeErrors(document) {
     return document.darts.flatMap(dart => dart.visible.length ? [] : [`${dart.id} needs a visible region (or remove this dart).`]);
   }
@@ -127,7 +137,7 @@
     }
     return found;
   }
-  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, setScore, nearestEdge, completeErrors, intersections};
+  const api = {clone, parts, History, regions, addPolygon, polygonPoints, removePolygon, setTip, setScore, nearestEdge, addVertex, removeVertex, completeErrors, intersections};
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.DartEditor = api;
 })(typeof window === "undefined" ? globalThis : window);

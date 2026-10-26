@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "image": "PXL_20261018_154231645.jpg",
+  "width": 6144,
+  "height": 8160,
+  "sha256": "a88a1d7d8ade4a674b211aa722c6a07cbdd7c753275c29b146f2b99e19541735",
+  "status": "draft",
+  "darts": [
+    {
+      "id": "dart-1",
+      "visible": [],
+      "silhouette": [],
+      "tip_status": "exact",
+      "tip": [
+        2887.3172722071317,
+        3560.8285791908083
+      ],
+      "contact": "embedded",
+      "score": {
+        "number": 12,
+        "multiplier": "single"
+      }
+    },
+    {
+      "id": "dart-2",
+      "visible": [],
+      "silhouette": [],
+      "tip_status": "exact",
+      "tip": [
+        3407.465074820956,
+        3975.890556802427
+      ],
+      "contact": "unknown",
+      "score": {
+        "number": 13,
+        "multiplier": "single"
+      }
+    },
+    {
+      "id": "dart-3",
+      "visible": [],
+      "silhouette": [],
+      "tip_status": "approximate",
+      "tip": [
+        2986.394863565217,
+        2694.6655458326054
+      ],
+      "contact": "embedded",
+      "score": {
+        "number": 20,
+        "multiplier": "single"
+      }
+    }
+  ],
+  "ignore": []
+}

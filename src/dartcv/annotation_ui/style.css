@@ -6,6 +6,8 @@ button, select { font: inherit; padding: .35rem; border: 1px solid #687386; bord
 button { cursor: pointer; }
 button:disabled { cursor: default; opacity: .45; }
 button:hover:not(:disabled) { background: #465775; }
+button[aria-pressed="true"] { background: #465775; border-color: #ffca65; outline: 1px solid #ffca65; }
+#edit-mode { font-size: .85rem; color: #ffca65; margin-bottom: .4rem; }
 #photos { max-width: 29rem; }
 #dirty { color: #ffca65; }
 #message { padding: .5rem .8rem; min-height: 2rem; background: #202630; white-space: pre-wrap; }

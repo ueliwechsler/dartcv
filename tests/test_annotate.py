@@ -71,6 +71,21 @@ def test_changed_or_corrupt_inputs_never_load_as_clean_drafts(store):
         store.load("one.jpg")
 
 
+def test_ai_draft_survives_corrections_until_explicit_completion(store):
+    annotation = completed(store)
+    annotation["status"] = "ai-draft"
+    saved = store.save("one.jpg", annotation, None)
+    assert saved["status"] == "ai-draft"
+    assert store.listing()[0]["status"] == "ai-draft"
+    loaded = store.load("one.jpg")
+    loaded["annotation"]["darts"][0]["visible"][0]["points"][0] = [2, 1]
+    saved = store.save("one.jpg", loaded["annotation"], loaded["revision"])
+    assert store.load("one.jpg")["annotation"]["status"] == "ai-draft"
+    loaded["annotation"]["status"] = "completed"
+    store.save("one.jpg", loaded["annotation"], saved["revision"])
+    assert store.listing()[0]["status"] == "completed"
+
+
 def test_folder_selection_keeps_same_named_images_and_labels_separate(tmp_path):
     root = tmp_path / "images"
     for folder, value in (("multi_dart", 100), ("single_dart", 150)):
@@ -86,7 +101,7 @@ def test_folder_selection_keeps_same_named_images_and_labels_separate(tmp_path):
     assert single.load("one.jpg")["revision"] is None
     assert single.load("one.jpg")["annotation"]["sha256"] != annotation["sha256"]
     single.save("one.jpg", completed(single), None)
-    assert (tmp_path / "labels/one.jpg.json").is_file()
+    assert (tmp_path / "labels/multi_dart/one.jpg.json").is_file()
     assert (tmp_path / "labels/single_dart/one.jpg.json").is_file()
     with pytest.raises(ValueError, match="Unknown image folder"):
         folders.select("../elsewhere")
@@ -107,6 +122,15 @@ def test_folder_selection_keeps_same_named_images_and_labels_separate(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_direct_image_folder_uses_exact_annotation_directory(store, tmp_path):
+    output = tmp_path / "custom-labels"
+    folders = AnnotationFolders(store.image_dir, output)
+    selected = folders.select(".")
+    selected.save("one.jpg", completed(selected), None)
+    assert (output / "one.jpg.json").is_file()
+    assert not (output / store.image_dir.name).exists()
 
 
 def test_local_http_load_save_and_origin_guards(store):

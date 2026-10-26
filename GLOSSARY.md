@@ -5,6 +5,11 @@ estimated, and scoring outcomes are represented.
 
 ## Language
 
+**AI draft annotation**:
+An AI-preannotated photograph awaiting human review, including any corrections
+made before the reviewer explicitly declares it completed.
+_Avoid_: Verified annotation, completed annotation
+
 **Visible dart region**:
 The portion of an individual dart visible in a photograph, excluding parts
 hidden behind other objects.

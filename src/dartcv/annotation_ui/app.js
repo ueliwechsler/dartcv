@@ -80,6 +80,15 @@
     for (const id of ["tip", "approximate-tip", "unknown-tip", "remove-dart"]) $(id).disabled = !dart;
     $("copy").disabled = !selected() || selected().kind !== "visible";
     $("delete").disabled = !selected();
+    for (const id of ["add-vertex", "remove-vertex"]) {
+      $(id).disabled = !selected() || state.mode === "draw";
+      $(id).setAttribute("aria-pressed", String(state.mode === id));
+    }
+    $("edit-mode").textContent = state.mode === "add-vertex"
+      ? "Add mode: click polygon edges. Esc to select/drag."
+      : state.mode === "remove-vertex"
+        ? "Remove mode: click vertices. Esc to select/drag."
+        : "Select a polygon to drag vertices or use A / R.";
     $("finish").disabled = state.mode !== "draw";
     const warnings = regions().map((region, index) => {
       const count = E.intersections(region.points).length;
@@ -242,6 +251,26 @@
     });
     return index;
   }
+  function vertexMode(mode) {
+    requireNoDrawing();
+    if (state.drag) throw new Error("Finish dragging before changing tools.");
+    if (!selected()) throw new Error("Select a polygon first.");
+    state.mode = mode;
+    refresh();
+    message(mode === "add-vertex"
+      ? "Click edges of the selected polygon to add vertices. Esc returns to selection/dragging."
+      : "Click vertices of the selected polygon to remove them. At least three must remain. Esc returns to selection/dragging.");
+    canvas.focus();
+  }
+  function editVertex(point, mode) {
+    const region = selected();
+    if (!region) throw new Error("Select a polygon first.");
+    mutate(next => {
+      const points = E.polygonPoints(next, state.dart, region);
+      if (mode === "add-vertex") E.addVertex(points, point, 10 / state.scale);
+      else E.removeVertex(points, nearestVertex(points, point));
+    });
+  }
   canvas.addEventListener("pointerdown", run(event => {
     if (!state.history || state.drag) return;
     canvas.focus();
@@ -257,6 +286,9 @@
       if (state.mode === "tip") {
         mutate(next => E.setTip(next.darts[state.dart], point, state.tipStatus));
         state.mode = "edit"; message(`${state.tipStatus === "approximate" ? "Approximate" : "Exact"} tip placed. Set board contact separately.`); return;
+      }
+      if (["add-vertex", "remove-vertex"].includes(state.mode)) {
+        editVertex(point, state.mode); return;
       }
       const region = selected();
       const vertex = region ? nearestVertex(region.points, point) : -1;
@@ -306,17 +338,12 @@
     if (state.mode === "draw") { state.pending.pop(); refresh(); return; }
     const region = selected();
     if (!region) return;
-    const index = nearestVertex(region.points, source(cursor(event), true));
-    if (index < 0) return;
-    if (region.points.length <= 3) throw new Error("A polygon needs three vertices. Delete the polygon instead.");
-    mutate(next => E.polygonPoints(next, state.dart, region).splice(index, 1));
+    editVertex(source(cursor(event), true), "remove-vertex");
   }));
   canvas.addEventListener("dblclick", run(event => {
     if (state.mode !== "edit" || !selected()) return;
     endDrag();
-    const region = selected(), point = source(cursor(event));
-    const edge = E.nearestEdge(region.points, point);
-    if (edge.distance <= 10 / state.scale) mutate(next => E.polygonPoints(next, state.dart, region).splice(edge.index + 1, 0, point));
+    editVertex(source(cursor(event)), "add-vertex");
   }));
   canvas.addEventListener("wheel", event => {
     if (!state.history || state.busy) return;
@@ -353,6 +380,8 @@
     if (next) await load(state.index + 1, false);
   }
   function bind(id, callback) { $(id).addEventListener("click", run(callback)); }
+  bind("add-vertex", () => vertexMode("add-vertex"));
+  bind("remove-vertex", () => vertexMode("remove-vertex"));
   bind("draw", () => {
     requireNoDrawing();
     if ($("layer").value !== "ignore" && !activeDart()) throw new Error("Add/select a dart first.");
@@ -360,7 +389,7 @@
     message(`Drawing ${state.layer}. Click visible boundary vertices, then Enter. Space+drag pans.`); refresh();
   });
   bind("finish", finish);
-  bind("cancel", () => { cancelMode(); message("Drawing canceled; existing polygons are unchanged."); });
+  bind("cancel", () => { cancelMode(); message("Selection mode. Drag vertices, double-click an edge to add, or right-click a vertex to remove."); });
   bind("tip", () => {
     requireNoDrawing(); state.mode = "tip"; state.tipStatus = "exact"; message("Click the exact physical tip. Pan/zoom first if needed.");
   });
@@ -466,10 +495,17 @@
   $("show-inferred").addEventListener("change", render);
   $("show-crossings").addEventListener("change", render);
   window.addEventListener("keydown", run(event => {
-    if (!state.history || ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(document.activeElement.tagName)) return;
+    if (!state.history || document.activeElement.isContentEditable ||
+        ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+    if (event.key === "Escape") { cancelMode(); return; }
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && ["a", "r"].includes(event.key.toLowerCase())) {
+      event.preventDefault();
+      vertexMode(event.key.toLowerCase() === "a" ? "add-vertex" : "remove-vertex");
+      return;
+    }
+    if (document.activeElement.tagName === "BUTTON") return;
     if (event.code === "Space") { state.space = true; event.preventDefault(); }
     if (event.key === "Enter") { event.preventDefault(); finish(); }
-    if (event.key === "Escape") cancelMode();
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
       event.preventDefault(); $(event.shiftKey ? "redo" : "undo").click();
     }
@@ -483,11 +519,11 @@
     photos: "Select a local photograph. Unsaved edits trigger a discard warning.",
     previous: "Open the previous photograph; save first to keep your changes.",
     next: "Open the next photograph; save first to keep your changes.",
-    unfinished: "Jump to the next new or draft photograph.",
+    unfinished: "Jump to the next new, draft or ai-draft photograph awaiting review.",
     save: "Validate and save labels to disk. Draft work can be resumed later.",
     "save-next": "Save this photograph, then open the next one.",
     download: "Download a JSON copy. This does not save changes to the server.",
-    status: "Completed asserts that every visible dart is labeled. Unmarked pixels become background except ignore regions.",
+    status: "AI draft (ai-draft) means AI-preannotated and awaiting human review; saving corrections keeps this status. Choose Completed explicitly after review: every visible dart must be labeled. Unmarked pixels become background except ignore regions.",
     darts: "Each dart has its own visible regions, optional silhouette, tip, contact and score.",
     "add-dart": "Add another dart. Three is a convenience default, not a required count.",
     "remove-dart": "Remove this dart and all its labels. Undo restores it.",
@@ -500,8 +536,10 @@
     layer: "Visible flight: fins. Shaft/barrel: body, shaft and visible metal tip. Uncertain part: definitely dart, part unclear. Inferred silhouette: includes hidden shape, not ground truth. Ignore: dart/background truly ambiguous.",
     draw: "Click boundary vertices in order, then Enter or Finish. Separate disconnected visible pieces into multiple polygons.",
     finish: "Close the polygon with at least three non-collinear vertices. Crossing and self-touching edges are allowed; overlapping loops use even-odd filling.",
-    cancel: "Discard only the unfinished polygon; saved regions remain unchanged.",
-    regions: "Select a polygon to edit. Drag vertices, double-click an edge to insert, right-click a vertex to remove.",
+    cancel: "Return to selection/dragging (Esc), canceling any unfinished polygon. Existing polygons remain unchanged.",
+    regions: "Select a polygon to edit. Drag vertices; double-click an edge to add a vertex, or right-click a vertex to remove it. Alternatively use Add vertex (A) / Remove vertex (R), then click.",
+    "add-vertex": "Press A or click this button, then click edges of the selected polygon to add corners repeatedly. Double-click an edge also adds a vertex in selection mode. Esc returns to selection/dragging.",
+    "remove-vertex": "Press R or click this button, then click vertices of the selected polygon to remove them repeatedly. Right-click a vertex also removes it. At least three must remain. Esc returns to selection/dragging.",
     copy: "Create an independent inferred silhouette from the selected visible region. Editing it leaves visible ground truth unchanged.",
     delete: "Delete the selected polygon only, not the dart. Undo restores it.",
     undo: "Undo the last label edit; while drawing, remove the last vertex.",

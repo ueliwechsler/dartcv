@@ -94,7 +94,8 @@ regions, optional manual sector/ring scores (single by default), contextual
 hover help, undo/redo, and save/resume. Images stay local and unchanged.
 
 Follow [the annotation protocol](docs/dart-annotation.md). Save complete
-source-coordinate labels under `data/annotations/darts/`, then enable
+source-coordinate labels under `data/annotations/darts/<dataset>/`
+(for example, `multi_dart/`), then enable
 `RUN_LABEL_EVALUATION` in the segmentation comparison notebook for dart/part
 retention, foreground precision, IoU, coverage, and an error overlay. Inferred
 outlines and draft photos are not segmentation ground truth.

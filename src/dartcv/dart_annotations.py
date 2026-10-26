@@ -54,7 +54,7 @@ class ImageAnnotation:
     width: int
     height: int
     sha256: str
-    status: Literal["draft", "completed"]
+    status: Literal["draft", "ai-draft", "completed"]
     darts: tuple[AnnotatedDart, ...]
     ignore: tuple[Polygon, ...]
 
@@ -113,8 +113,8 @@ def parse_annotation(data: object) -> ImageAnnotation:
         or any(char not in "0123456789abcdef" for char in fingerprint)
     ):
         raise ValueError("Image sha256 must be a lowercase SHA-256 fingerprint.")
-    if data["status"] not in ("draft", "completed"):
-        raise ValueError("Status must be draft or completed.")
+    if data["status"] not in ("draft", "ai-draft", "completed"):
+        raise ValueError("Status must be draft, ai-draft or completed.")
 
     def point(value: object) -> Point:
         if not isinstance(value, (list, tuple)) or len(value) != 2:

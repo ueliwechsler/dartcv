@@ -17,10 +17,11 @@ selected folder. Changing folders warns before discarding unsaved edits.
 Only discovered folders under the configured image root can be selected.
 `--images` also accepts a single folder containing photos.
 
-Existing multi-dart labels stay in `data/annotations/darts/`; other datasets
-use a subdirectory such as `data/annotations/darts/single_dart/` to avoid
-filename collisions. When `--images` points directly to a photo folder, its
-labels go directly in `--annotations`, preserving the original workflow.
+Labels mirror dataset folders: `data/images/multi_dart/photo.jpg` has its labels
+in `data/annotations/darts/multi_dart/photo.jpg.json`. The same rule applies to
+`single_dart`, `edge_cases`, and `raw_board`, avoiding filename collisions.
+When `--images` points directly to a photo folder, its labels go directly in
+the exact directory supplied via `--annotations`.
 If an image root itself contains photos as well as child folders, its own
 photos appear as "Selected image folder" and all children use label subdirectories.
 For evaluation of another dataset, set the notebook's `LABEL_DIR` accordingly.
@@ -29,7 +30,7 @@ To choose another local dataset or output directory:
 
 ```bash
 uv run python -m dartcv.annotate --images data/images/multi_dart \
-  --annotations data/annotations/darts --port 8765
+  --annotations data/annotations/darts/multi_dart --port 8765
 ```
 
 ## Labeling protocol
@@ -76,6 +77,31 @@ boundaries, or chose the right contact status. Completion is a human assertion;
 the server checks label structure and requires visible regions for every listed
 dart. No exact-three or on-board-only assumption is made.
 
+### AI-assisted draft baseline
+
+The 43-photo batch adds drafts for 26 `single_dart` photos
+(`PXL_20261018_152711553.jpg` through `PXL_20261018_153344947.jpg`),
+16 `multi_dart` photos (`PXL_20261018_154237729.jpg` through
+`PXL_20261018_154823461.jpg`), and
+`edge_cases/darts_overlapping_in_tripple_20.jpg`. Existing sidecars were preserved.
+These 77 darts were labeled by visual inspection of local magnified crops, not
+by the recognition pipeline or a trained detector. Polygons are coarse visible
+flight and shaft/barrel drafts; no hidden silhouettes were inferred.
+
+These 43 photos and the earlier AI experiment
+(`single_dart/PXL_20261018_152650640.jpg`) use **AI draft** (`ai-draft`) status.
+It means AI-preannotated and awaiting human review. Saving corrections retains
+this status; explicitly choose Completed only after reviewing the whole photo.
+AI drafts appear in the photo list and in Next unfinished, and are excluded
+from evaluation just like ordinary drafts. This is a review status, not
+permanent authorship metadata: completing the photo replaces it with Completed.
+
+All 76 placed tips are approximate; one obscured tip remains unknown. Only eight
+scores were tentatively labeled; other scores remain null. Review boundaries,
+overlapping-dart ownership, tip/contact positions and any score before marking
+these photos Completed or using them as training/evaluation truth. In particular,
+draft tips near scoring wires do not establish which side of the wire was hit.
+
 ## Editing and saving
 
 - Wheel or Zoom +/- to zoom; Fit Image resets the view. Hold Space and drag, or
@@ -83,8 +109,14 @@ dart. No exact-three or on-board-only assumption is made.
 - Hover a control for its native tooltip, or hover/focus the adjacent **?**
   badge for a contextual help box. Keyboard users can Tab to the badges.
 - Select a polygon in the list, then drag vertices. Double-click an edge to add
-  a vertex; right-click a vertex to remove it. Right-click during drawing removes
-  the most recent point. Delete selected polygon removes an entire region.
+  a vertex; right-click a vertex to remove it. For repeated corrections, select
+  **Add vertex (A)** and click edges, or **Remove vertex (R)** and click corners.
+  These modes stay active until changed; highlighted buttons and a mode hint
+  show the current tool. **Esc** or **Select / cancel** returns to selection
+  and dragging. A/R shortcuts do not activate while typing in a field.
+  Removing a corner joins its neighbors; at least three vertices must remain.
+  Right-click during drawing removes the most recent point.
+  Delete selected polygon removes an entire region.
 - Undo/redo applies to labels, not zoom/pan. Escape cancels an unfinished polygon.
   Finish or cancel a polygon before changing darts, saving, or navigating.
 - An unsaved indicator and navigation/close warnings protect pending work.
@@ -104,7 +136,7 @@ extension to avoid collisions. `schema_version: 1` contains:
 | Field | Meaning |
 | --- | --- |
 | `image`, `width`, `height`, `sha256` | Original filename, decoded pixel dimensions and source-file fingerprint |
-| `status` | `draft` or `completed` |
+| `status` | `draft`, `ai-draft` (AI-preannotated, awaiting human review), or `completed` |
 | `darts[].id` | Unique per-photo dart identity |
 | `darts[].visible[]` | `part` (`flight`, `shaft_barrel`, `uncertain`) and polygon `points` |
 | `darts[].silhouette[]` | Optional complete inferred polygons, distinct from observations |

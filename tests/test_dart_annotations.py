@@ -100,7 +100,8 @@ def test_visible_evaluation_ignores_inferred_shapes_and_ambiguous_pixels():
     assert len(plot_visible_mask_evaluation(result).axes) == 1
 
 
-def test_projection_coverage_and_no_applicable_labels_are_explicit():
+@pytest.mark.parametrize("draft_status", ["draft", "ai-draft"])
+def test_projection_coverage_and_no_applicable_labels_are_explicit(draft_status):
     annotation = parse_annotation(labels())
     transform = np.array([[1., 0, -20], [0, 1, 0], [0, 0, 1]])
     normalized = view(30, transform)
@@ -117,7 +118,7 @@ def test_projection_coverage_and_no_applicable_labels_are_explicit():
     assert metrics.recall is metrics.precision is metrics.iou is None
     assert metrics.label_coverage == 0
     data = labels()
-    data["status"] = "draft"
+    data["status"] = draft_status
     with pytest.raises(ValueError, match="Complete"):
         evaluate_visible_masks(view(), np.zeros((100, 100), np.float32), parse_annotation(data))
 
@@ -167,16 +168,18 @@ def test_approximate_tip_round_trip_and_required_coordinates():
         parse_annotation(data)
 
 
-@pytest.mark.parametrize("status", ["completed", "draft", "missing"])
-def test_comparison_notebook_consumes_saved_labels(tmp_path, capsys, status):
+@pytest.mark.parametrize("status", ["completed", "draft", "ai-draft", "missing"])
+@pytest.mark.parametrize("dataset", ["multi_dart", "single_dart", "edge_cases", "raw_board"])
+def test_comparison_notebook_consumes_saved_labels(tmp_path, capsys, status, dataset):
     root = Path(__file__).resolve().parents[1]
     notebook = json.loads((root / "examples/color_dart_segmentation_comparison.ipynb").read_text())
     cell = next(cell for cell in notebook["cells"] if cell.get("id") == "visible-label-evaluation")
-    source_image = tmp_path / "photo.jpg"
+    source_image = tmp_path / "data/images" / dataset / "photo.jpg"
+    source_image.parent.mkdir(parents=True)
     source_image.write_bytes(b"source identity for integration")
     data = labels()
     data["sha256"] = sha256(source_image.read_bytes()).hexdigest()
-    output = tmp_path / "data/annotations/darts"
+    output = tmp_path / "data/annotations/darts" / dataset
     output.mkdir(parents=True)
     if status != "missing":
         data["status"] = status
@@ -197,7 +200,7 @@ def test_comparison_notebook_consumes_saved_labels(tmp_path, capsys, status):
         assert len(figures) == 1
     else:
         assert not figures
-        expected = "draft labels are excluded" if status == "draft" else "No visible-region labels"
+        expected = "draft labels are excluded" if status in ("draft", "ai-draft") else "No visible-region labels"
         assert expected in text
 
 
@@ -242,6 +245,17 @@ assert.equal(changed.darts[0].visible.length, 1);
 assert.equal(changed.darts[0].silhouette.length, 2);
 assert.equal(E.completeErrors(initial).length, 0);
 assert.equal(E.nearestEdge(points, [5,1]).index, 0);
+const editedPoints = E.clone(points);
+E.addVertex(editedPoints, [5,1], 1);
+assert.deepEqual(editedPoints, [[1,1],[5,1],[9,1],[5,8]]);
+E.removeVertex(editedPoints, 1);
+assert.deepEqual(editedPoints, points);
+assert.throws(() => E.removeVertex(editedPoints, 0), /three vertices/);
+assert.throws(() => E.removeVertex(editedPoints, -1), /Click a vertex/);
+assert.throws(() => E.addVertex(editedPoints, [100,100], 1), /Click an edge/);
+E.addVertex(editedPoints, [3,4.5], 1);
+assert.deepEqual(editedPoints.at(-1), [3,4.5]);
+assert.deepEqual(points, [[1,1],[9,1],[5,8]]);
 assert.deepEqual(E.intersections([[0,0],[10,10],[0,10],[10,0]]), [[5,5]]);
 assert.deepEqual(E.intersections([[0,0],[10,0],[10,10],[0,10]]), []);
 assert.ok(E.intersections([[0,0],[10,0],[10,10],[0,0],[-10,10],[-10,0]]).some(p => p[0] === 0 && p[1] === 0));
@@ -265,4 +279,13 @@ assert.equal(approximate.document.darts[0].tip_status, 'approximate');
 E.setTip(placed.darts[0], null);
 assert.equal(placed.darts[0].tip_status, 'unknown');
 """, str(editor), json.dumps(labels())], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_browser_vertex_modes_and_shortcuts():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is needed for the browser editor interaction tests.")
+    script = Path(__file__).with_name("annotation_ui.test.cjs")
+    result = subprocess.run([node, str(script)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
