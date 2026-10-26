@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dart annotations</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/editor.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <strong>Dart annotations</strong>
+    <label>Folder <select id="folders" aria-label="Image folder"></select></label>
+    <button id="previous">Previous</button>
+    <select id="photos" aria-label="Photograph"></select>
+    <button id="next">Next</button>
+    <button id="unfinished">Next unfinished</button>
+    <span id="dirty"></span>
+    <button id="save">Save</button>
+    <button id="save-next">Save &amp; Next</button>
+    <button id="download">Download JSON</button>
+  </header>
+  <div id="message" role="status" aria-live="polite">Loading local photographs...</div>
+  <main>
+    <aside>
+      <label>Photo status <select id="status"><option value="draft">Draft</option><option value="ai-draft">AI draft (needs review)</option><option value="completed">Completed</option></select></label>
+      <label>Dart <select id="darts"></select></label>
+      <div><button id="add-dart">Add dart</button> <button id="remove-dart">Remove dart</button></div>
+      <label>Board contact <select id="contact">
+        <option value="unknown">Unknown</option><option value="embedded">Embedded</option><option value="not_embedded">Not embedded</option>
+      </select></label>
+      <div id="tip-status"></div>
+      <div><button id="tip">Place exact tip</button> <button id="approximate-tip">Place approximate tip</button> <button id="unknown-tip">Hidden / unknown (no point)</button></div>
+      <label>Optional score <select id="score-number" aria-label="Score number"></select></label>
+      <label>Scoring ring <select id="score-multiplier">
+        <option value="single">Single (default)</option>
+        <option value="double">Double</option>
+        <option value="triple">Triple</option>
+      </select></label>
+      <div id="score-points" aria-live="polite"></div>
+      <hr>
+      <label>New polygon <select id="layer">
+        <option value="flight">Visible flight</option>
+        <option value="shaft_barrel">Visible shaft / barrel / metal tip</option>
+        <option value="uncertain">Visible dart, uncertain part</option>
+        <option value="silhouette">Complete inferred silhouette</option>
+        <option value="ignore">Ignore ambiguous pixels</option>
+      </select></label>
+      <div><button id="draw">Draw polygon</button> <button id="finish">Finish (Enter)</button></div>
+      <button id="cancel">Select / cancel (Esc)</button>
+      <label>Selected polygon <select id="regions" size="6" aria-label="Selected polygon"></select></label>
+      <div><button id="add-vertex" aria-pressed="false" aria-keyshortcuts="A">Add vertex (A)</button> <button id="remove-vertex" aria-pressed="false" aria-keyshortcuts="R">Remove vertex (R)</button></div>
+      <div id="edit-mode" role="status" aria-live="polite"></div>
+      <button id="copy">Copy visible to inferred silhouette</button>
+      <button id="delete">Delete selected polygon</button>
+      <div id="polygon-warnings" role="status" aria-live="polite"></div>
+      <label><input id="show-crossings" type="checkbox" checked> Mark crossings / touches (yellow circles)</label>
+      <div><button id="undo">Undo</button> <button id="redo">Redo</button></div>
+      <hr>
+      <div><button id="fit">Fit image</button> <button id="zoom-in">Zoom +</button> <button id="zoom-out">Zoom -</button></div>
+      <label><input id="show-inferred" type="checkbox" checked> Show inferred silhouettes</label>
+      <p>Wheel to zoom. Space + drag (or middle button) to pan. Draw by clicking vertices; Enter closes. Select a polygon, then use Add vertex (A) and click edges, or Remove vertex (R) and click corners. Esc returns to selection/dragging. Double-click an edge to add a vertex; right-click a vertex to remove it. At least three vertices must remain.</p>
+      <p>Tip means the physical point, not an image-edge crossing. Exact = visible endpoint; approximate = estimated position; hidden/unknown = no point. Board contact is separate.</p>
+      <p>Trace only visible pixels in part polygons. Use separate polygons for disconnected pieces of one dart. Inferred silhouettes never count as segmentation truth. All other pixels on a completed photo are background except ignore regions.</p>
+      <p>Originals stay untouched; all coordinates are in original-resolution OpenCV-decoded photo pixels. No images leave this machine.</p>
+    </aside>
+    <section id="viewport" aria-label="Image annotation canvas">
+      <canvas id="canvas" tabindex="0" aria-label="Draw polygons and tip points on the photograph"></canvas>
+    </section>
+  </main>
+</body>
+</html>

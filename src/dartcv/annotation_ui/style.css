@@ -1,0 +1,26 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; font-size: 14px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #17191e; color: #e9eef5; }
+header { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .7rem; background: #252a34; }
+button, select { font: inherit; padding: .35rem; border: 1px solid #687386; border-radius: 4px; background: #30394a; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .45; }
+button:hover:not(:disabled) { background: #465775; }
+button[aria-pressed="true"] { background: #465775; border-color: #ffca65; outline: 1px solid #ffca65; }
+#edit-mode { font-size: .85rem; color: #ffca65; margin-bottom: .4rem; }
+#photos { max-width: 29rem; }
+#dirty { color: #ffca65; }
+#message { padding: .5rem .8rem; min-height: 2rem; background: #202630; white-space: pre-wrap; }
+#message.error { color: #ffafaf; background: #4c2529; }
+main { display: flex; height: calc(100vh - 112px); min-height: 500px; }
+aside { flex: 0 0 300px; padding: .8rem; overflow-y: auto; background: #222732; }
+aside label { display: block; margin: .6rem 0; }
+aside label select { display: block; width: 100%; margin-top: .3rem; }
+aside button { margin-bottom: .4rem; }
+aside p { font-size: .85rem; line-height: 1.45; color: #c3cbd8; }
+#viewport { flex: 1; min-width: 100px; position: relative; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; outline-offset: -3px; cursor: crosshair; }
+hr { border: 0; border-top: 1px solid #535c6d; margin: .8rem 0; }
+.context-help { display: inline-block; position: relative; margin: 0 .3rem; padding: 0 .3rem; border: 1px solid #889bb6; border-radius: 50%; color: #c8e0ff; font-size: .8rem; cursor: help; }
+.help-popup { display: none; position: absolute; z-index: 10; left: 0; top: 1.4rem; width: min(270px, 75vw); padding: .7rem; border: 1px solid #8ba5c8; border-radius: 5px; background: #101a28; color: #fff; font-size: .9rem; line-height: 1.4; box-shadow: 0 4px 14px #0009; }
+.context-help:hover .help-popup, .context-help:focus .help-popup { display: block; }

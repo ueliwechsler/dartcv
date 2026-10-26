@@ -1,7 +1,7 @@
 [project]
 name = "dartcv"
 version = "0.1.0"
-description = "Add your description here"
+description = "Dartboard computer vision and scoring tools."
 readme = "README.md"
 authors = [
     { name = "Benjamin Estermann", email = "benjamin.estermann@bluewin.ch" },
@@ -14,7 +14,17 @@ dependencies = [
     "numpy>=2.5.4",
     "opencv-python>=5.0.0.93",
     "pyopenssl>=24.0.0",
+    "scikit-image>=0.26.0",
+    "scikit-learn>=1.7.0",
     "scipy>=1.16",
+]
+
+[project.optional-dependencies]
+dart-detection = [
+    "torch>=2.6,<3",
+    "torchvision>=0.21,<1",
+    "transformers>=4.57,<5",
+    "pillow>=11",
 ]
 
 [project.scripts]

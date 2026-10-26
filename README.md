@@ -7,7 +7,6 @@ WIP: Dart computer vision framework enabling a smart phone to count your darts s
 - [Architecture](docs/architecture.md): components, data flow, and coordinate contracts.
 - [Architecture template](docs/templates/architecture.md): required structure for the living architecture document.
 - [Technical CV pipeline](docs/cv-pipeline.md): detection stages, refinement, fallbacks, and limitations.
-- [Agent instructions](AGENTS.md): documentation maintenance and verification rules for coding agents.
 
 ## Board detection and diagnostic images
 
@@ -70,6 +69,182 @@ supplied intersections. These modes write the three standard images and
 `05_calibration.png`, labelled as supplied points; automatic-stage images are
 not generated. Use a fresh output directory when comparing different modes to
 avoid confusing older images with a new run.
+
+## Running notebooks after code changes
+
+Select the repository's `.venv` Python kernel (`uv sync --group dev`). After
+updating code, **Restart Kernel**, then **Run All**. Existing imports and analysis
+objects can otherwise retain the previous API, causing errors such as missing
+`ColorAssignment` or `color_model_names`. All notebooks enable autoreload for
+subsequent edits, but analysis cells still need rerunning; structural changes to
+classes/dataclasses require a restart.
+
+`uv run --group dev pytest -q tests/test_notebooks.py` executes every notebook's
+default cells in fresh IPython sessions, with outputs isolated in temporary
+directories. Image notebooks are skipped if local DVC photographs are absent.
+Optional batch/ablation switches remain off in this smoke check.
+
+## Annotate darts locally
+
+Run `uv run python -m dartcv.annotate` and open `http://127.0.0.1:8765`.
+Choose an image folder, then a photograph, then a dart. The local browser
+editor supports zoom/pan, per-dart editable polygons,
+flight/shaft labels, optional inferred outlines, exact/approximate/unknown tips, ignore
+regions, optional manual sector/ring scores (single by default), contextual
+hover help, undo/redo, and save/resume. Images stay local and unchanged.
+
+Follow [the annotation protocol](docs/dart-annotation.md). Save complete
+source-coordinate labels under `data/annotations/darts/<dataset>/`
+(for example, `multi_dart/`), then enable
+`RUN_LABEL_EVALUATION` in the segmentation comparison notebook for dart/part
+retention, foreground precision, IoU, coverage, and an error overlay. Inferred
+outlines and draft photos are not segmentation ground truth.
+
+## Dart scoring notebook
+
+[examples/dart_scorer_pipeline.ipynb](examples/dart_scorer_pipeline.ipynb) stages the
+scoring logic from model-space checks to image-space homography scoring and a
+final end-to-end board run. The notebook validates the standard radius/sector rules,
+confirms the homography round-trip on synthetic calibration points, and shows how
+`detect_board()` feeds the same score helpers used in the live pipeline.
+
+## Multi-dart board inspection
+
+Open [examples/color_dart_board_inspection.ipynb](examples/color_dart_board_inspection.ipynb)
+in VS Code with the project's Python environment (`uv sync --group dev`).
+Run the cells, choose `IMAGE_INDEX` from `data/images/multi_dart`, and rerun from
+**Run preparation** to switch photos. The notebook shows source/normalized views,
+nominal ring/spoke overlays, color and board masks, detector artifacts, and
+per-stage timings; an opt-in cell compares normalization resolutions.
+
+The notebook uses `prepare_board(image, diagnostics=True)`, also available as a
+library function without constructing unfinished recognition stages. Expected
+failures remain visible with partial diagnostics. Plotting returns a Matplotlib
+figure without automatically showing or saving it.
+
+This is board preparation only: overlays are nominal geometry, not detected
+physical wires or confirmed numbered sectors. The normalized view excludes the
+outer printed-number ring by default. Full-resolution diagnostic snapshots are
+opt-in and memory-heavy.
+
+For milestone 3, open
+[examples/color_dart_orientation_inspection.ipynb](examples/color_dart_orientation_inspection.ipynb).
+It requests an optional wider view with source-coverage mask, extracts an explicit
+`20` template from a manually identified reference, and inspects the number strip,
+candidate matches, confidence and internal timings on another photo. The original
+board-inspection notebook and scoring-view transforms are unchanged.
+
+`Printed20OrientationStage(template)` is an injectable, local OpenCV matcher,
+not general OCR. Use `partial(normalize_board_view, number_ring_radius_mm=240.0)`
+as the normalizer to supply its input. Its clockwise correction is relative to
+the rectified model; uncertain guesses remain explicit and absent evidence fails.
+The template, annular radii and thresholds are provisional and board-style
+dependent. The tiny [annotation manifest](data/annotations/color_dart_orientation.json)
+is for inspected same-board examples, not a dataset accuracy claim. Orientation
+remains provisional; entry-point localization and new scoring are unimplemented.
+
+## Color-pipeline overview and image batches
+
+Start with [the combined pipeline overview](examples/color_dart_pipeline_overview.ipynb)
+to see every implemented color-pipeline stage in one place. It covers board
+preparation, printed-20 orientation, field sampling, four robust board-color
+models, and an initial dart-likelihood map. For detailed color-stage investigation,
+use [the segmentation notebook](examples/color_dart_segmentation_inspection.ipynb).
+Entry-point localization and independent scoring are not implemented yet.
+
+Every feature notebook now has a **Compact batch** section. Set `RUN_BATCH = True`
+and edit `BATCH_PATHS` (three images by default; remove `[:3]` for the directory).
+Only final outputs appear, in six-image pages with filenames, status and elapsed
+time. Copy a bad filename into the single-image selection to inspect intermediates.
+Run the color notebooks' explicit reference-template setup once before batching.
+Legacy batch cells have explicit `BATCH_*` settings; match them to the detailed
+settings when comparing results. Existing single-image cells and saved outputs
+are preserved.
+
+The visualization-only notebook batches render sizes instead of photographs.
+The old `find_single_dart.ipynb` scratch notebook batches its supported
+board-detection section, not its incomplete unrelated experiments. Batch scoring
+in `dart_scorer_pipeline.ipynb` uses the older scorer prototype, not the new color
+pipeline. Expected read/detection failures are shown rather than silently skipped.
+
+`RobustBoardColorSegmentationStage` fits per-image field-interior distributions
+in hue-wrapping HSV-cone coordinates. Its revised cleanup keeps thin interior
+components and restores nearby wire-crossing evidence without flooding the grid
+or opening away shafts. A weak numeral match retains the detector's paint
+alignment; numbered orientation remains uncertain. Raw anomalies and model
+support remain inspectable. Reflections and missed color-matching dart pixels
+remain possible; no blob is automatically declared a dart or assigned a score.
+
+Use [the segmentation comparison notebook](examples/color_dart_segmentation_comparison.ipynb)
+to compare **field-specific**, **any board color**, and **whole-board clustering**
+against no cleanup, hard grid removal, or support-preserving cleanup. It includes
+selected-image overlays, compact batches with `BATCH_VARIANT`, and an opt-in
+six-photo sparse annotation evaluation, split into four initial regressions and
+two additional unresolved challenge cases. The overview and detailed segmentation
+notebooks also have an optional `RUN_ABLATION` cell.
+
+On the small development subset, whole-board clustering removed more dart
+evidence because white flights/metal shafts resembled board colors. Field-specific
+matching remains the default, with `color_assignment="board_union"` or `"global"`
+available for experiments. These results do not establish full-mask accuracy;
+residual wire noise is still visible. The comparison notebook starts on a noisy
+challenge photo deliberately: no tested strategy cleanly isolates every dart.
+
+## Dart recognition notebook
+
+[examples/dart_recognition.ipynb](examples/dart_recognition.ipynb) walks one image
+(default: a photo from `data/images/single_dart/`, set via `IMAGE_PATH`) through
+board detection, rectification, dart/number/tip recognition slots, scoring, and a
+combined view. Use the project's `dartcv` kernel.
+
+Stage 4 defaults to the experimental classical single-dart detector in
+[src/dartcv/classical_darts.py](src/dartcv/classical_darts.py). It combines local
+colour/bright-flight contrast with attached parallel shaft edges, using the
+calibrated board to limit the search and reject paint confounders. It requires
+no optional runtime or model downloads. Configure `CLASSICAL_FLIGHT_HSV`,
+`CLASSICAL_WORK_SIZE`, `CLASSICAL_MIN_SCORE`, and `CLASSICAL_AMBIGUITY_MARGIN`
+in the contracts cell. `SHOW_CLASSICAL_DIAGNOSTICS` displays the search region,
+flight mask, line segments and ranked explanations. Quality scores are heuristic,
+not probabilities. It returns at most one box and abstains for weak or ambiguous
+evidence; it does not certify that exactly one dart exists.
+
+The current default photograph produces an abstention, not a correct box:
+board markings compete with the flight/shaft evidence. This is a constrained
+prototype, not established real-image detection accuracy. Dark flights, merged
+paint components, thin shafts and occlusions remain important limitations.
+
+The existing OWLv2 backend remains available for a pretrained comparison. Install
+its optional runtime:
+
+```sh
+uv sync --extra dart-detection --group dev
+```
+
+The first inference downloads model weights (hundreds of MB) into the local
+Hugging Face cache, not the repository or DVC dataset. The model runs locally;
+photos are not uploaded. Model weights use Apache-2.0 licensing. The default
+revision is pinned in [src/dartcv/dart_detection.py](src/dartcv/dart_detection.py).
+Construction/import does not download; `local_files_only=True` on the adapter
+forbids downloads and requires a populated cache. CPU is its tested default.
+
+To compare it, assign `DART_DETECTOR = Owlv2DartDetector()` after importing that
+class from `dartcv.dart_detection` and running the classical setup. Re-running
+the setup restores the classical backend. The notebook caches one classical
+detector while its settings and `H` match. A kernel restart clears it. Set
+`ENABLE_DART_DETECTION = False` to skip detection. Core CLI behavior is unchanged.
+OWLv2 is experimental: a flight-only box or a box around the board is not a
+successful whole-dart detection. Its scores are not accuracy probabilities.
+
+Number reading and tip localisation still have unset backend slots and report
+`not configured`. Boxes alone never produce scores. Scores can be computed for
+hand-picked `MANUAL_TIPS`, using the standard board radii.
+
+Reusable contracts, validation, and backend execution live in
+[src/dartcv/recognition.py](src/dartcv/recognition.py); drawing helpers live in
+[src/dartcv/recognition_overlay.py](src/dartcv/recognition_overlay.py).
+The notebook imports these helpers and keeps only configuration and presentation.
+See the [recognition roadmap](docs/cv-pipeline.md#recognition-contracts-and-next-detection-stage)
+for the proposed box/tip annotation, model integration, and evaluation sequence.
 
 ## Pictures on Google Drive (uv + DVC)
 
@@ -165,4 +340,3 @@ uv run dvc status -c
 These checks serve different purposes: a synchronized remote cache does not
 mean unrecorded local image changes have been uploaded. For those changes,
 repeat the add, DVC push, Git commit, and Git push workflow above.
-

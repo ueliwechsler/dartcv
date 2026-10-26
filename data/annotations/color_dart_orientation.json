@@ -1,0 +1,33 @@
+{
+  "description": "Small manually inspected same-board orientation fixtures, not a representative accuracy benchmark.",
+  "coordinate_system": "Original source-image pixel centers, [x, y]. Label centers were visually approximated independently of the detector; tolerance is 24 pixels.",
+  "reference": {
+    "image": "PXL_20261018_154400079.jpg",
+    "label_center_source_px": [3008, 1152],
+    "visibility": "visible",
+    "role": "Template source only; not an independent validation example."
+  },
+  "checks": [
+    {
+      "image": "PXL_20261018_154237729.jpg",
+      "label_center_source_px": [3280, 956],
+      "visibility": "visible",
+      "expected_confident": true,
+      "angle_tolerance_deg": 2.0
+    },
+    {
+      "image": "PXL_20261018_154539586.jpg",
+      "label_center_source_px": [3180, 900],
+      "visibility": "visible",
+      "expected_confident": true,
+      "angle_tolerance_deg": 2.0
+    },
+    {
+      "image": "PXL_20261018_154231645.jpg",
+      "label_center_source_px": null,
+      "visibility": "occluded",
+      "expected_confident": false,
+      "note": "The best guess can select a different numeral; do not treat it as a verified 20."
+    }
+  ]
+}
