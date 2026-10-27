@@ -7,7 +7,26 @@ WIP: Dart computer vision framework enabling a smart phone to count your darts s
 - [Architecture](docs/architecture.md): components, data flow, and coordinate contracts.
 - [Architecture template](docs/templates/architecture.md): required structure for the living architecture document.
 - [Technical CV pipeline](docs/cv-pipeline.md): detection stages, refinement, fallbacks, and limitations.
+- [Ground-Truth Dataset & Evaluation](docs/ground-truth-dataset.md): dataset schema, interactive web annotator, and quantitative benchmark harness.
 - [Agent instructions](AGENTS.md): documentation maintenance and verification rules for coding agents.
+
+## Quickstart: Annotation and Evaluation
+
+DartCV includes an interactive web annotator and a quantitative evaluation harness to benchmark board alignment, dart localization, and turn scoring against curated ground truth.
+
+```bash
+# Launch the interactive web annotator & evaluation dashboard on port 8080
+dartcv-annotate
+
+# Export standalone evaluation dashboard HTML
+dartcv-annotate --export-dashboard out/eval/dashboard.html
+
+# Run the quantitative evaluation benchmark and write reports to out/eval/
+dartcv-eval
+
+# Run board detection and dart scoring on a specific image
+dartcv data/images/single_dart/PXL_20261018_152634348.jpg --score --out out/demo
+```
 
 ## Board detection and diagnostic images
 
@@ -61,9 +80,11 @@ The fitted boundaries are available through `Detection.rings` and used in both
 source and top-down overlays, including where radial lines end. Occluded spokes
 are omitted; unreliable bands retain nominal boundaries. Smooth ellipses bridge
 wire gaps and small occlusions, so these are fitted boundaries rather than a
-pixel-perfect segmentation. The existing `score_from_model_point` and
-`score_from_image_point` helpers still use standard radii, not these independently
-measured paint contours.
+pixel-perfect segmentation. The `score_from_model_point` and
+`score_from_image_point` helpers use standard nominal radii, whereas
+`score_point_detailed` (used by `--score` and `analyze_image`) checks the fitted
+`Detection.rings` contours when available and falls back to nominal radii
+otherwise.
 
 With `--manual` or `--points`, the homography is instead computed from the four
 supplied intersections. These modes write the three standard images and

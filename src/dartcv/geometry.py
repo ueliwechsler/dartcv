@@ -86,3 +86,45 @@ def score_from_image_point(H: np.ndarray, xy) -> int:
     """Score of a pixel (e.g. a dart tip) given the model->image homography."""
     x, y = project(np.linalg.inv(H), [xy])[0]
     return score_from_model_point(float(x), float(y))
+
+
+def score_point_detailed(
+    H: np.ndarray, xy_px, rings: dict | None = None
+) -> tuple[int, int, int, str]:
+    """Score, sector, multiplier, and label for an image pixel (dart tip).
+
+    Maps xy_px (x, y) in original image pixels to model mm (x_mm, y_mm) via inv(H).
+    Returns (score, sector, multiplier, label).
+    """
+    pts = project(np.linalg.inv(H), [xy_px])[0]
+    x_mm, y_mm = float(pts[0]), float(pts[1])
+    r = math.hypot(x_mm, y_mm)
+    angle = (math.degrees(math.atan2(x_mm, -y_mm)) + 9.0) % 360.0
+    sector = SECTORS[int(angle // 18) % 20]
+
+    if r <= RADII["bull"]:
+        return (50, 50, 2, "DBULL")
+    if r <= RADII["outer_bull"]:
+        return (25, 25, 1, "BULL")
+
+    radii_local = {}
+    for name in ("treble_inner", "treble_outer", "double_inner", "double_outer"):
+        if rings and name in rings:
+            val = rings[name]
+            contour = val.contour if hasattr(val, "contour") else val
+            radii_local[name] = float(contour_radius(H, contour, [angle])[0])
+        else:
+            radii_local[name] = RADII[name]
+
+    r_double_outer = radii_local["double_outer"]
+    r_double_inner = radii_local["double_inner"]
+    r_treble_outer = radii_local["treble_outer"]
+    r_treble_inner = radii_local["treble_inner"]
+
+    if r > r_double_outer:
+        return (0, 0, 0, "MISS")
+    if r > r_double_inner:
+        return (2 * sector, sector, 2, f"D{sector}")
+    if r_treble_inner < r <= r_treble_outer:
+        return (3 * sector, sector, 3, f"T{sector}")
+    return (sector, sector, 1, f"S{sector}")

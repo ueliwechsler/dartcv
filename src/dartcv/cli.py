@@ -12,6 +12,10 @@ from .detect import DetectionError, detect_board
 from .diagnostics import calibration_overlay, detection_overlays
 from .geometry import CALIB_NAMES, compute_homography
 from .overlay import draw_overlay, topdown_overlay, warp_topdown
+try:
+    from .darts import detect_darts
+except ImportError:
+    detect_darts = None
 
 DEFAULT_IMAGE_PATH = Path("data/images/raw_board")
 IMAGE_SUFFIXES = {
@@ -111,6 +115,30 @@ def _process_image(image_path: Path, output_dir: Path, args) -> bool:
         outputs.update(detection_overlays(img, det))
     else:
         outputs["05_calibration.png"] = calibration_overlay(img, H, supplied=True)
+
+    if (getattr(args, "detect_darts", False) or getattr(args, "score", False)) and det is not None and detect_darts is not None:
+        darts, diag = detect_darts(img, det, diagnostics=True)
+        total_score = sum(d.score for d in darts)
+        print(f"{image_path}: detected {len(darts)} dart(s), total score: {total_score}")
+        for idx, d in enumerate(darts, 1):
+            print(f"  Dart #{idx}: {d.label} ({d.score} pts) at px=({d.tip_px[0]:.1f}, {d.tip_px[1]:.1f}) conf={d.confidence:.2f}")
+
+        darts_img = img.copy()
+        for idx, d in enumerate(darts, 1):
+            pt = (int(round(d.tip_px[0])), int(round(d.tip_px[1])))
+            cv2.drawMarker(darts_img, pt, (0, 255, 0), cv2.MARKER_CROSS, 24, 3, cv2.LINE_AA)
+            cv2.putText(
+                darts_img,
+                f"#{idx} {d.label} ({d.score})",
+                (pt[0] + 12, pt[1] - 8),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
+        outputs["08_darts_overlay.png"] = draw_overlay(darts_img, H, ring_contours=ring_contours)
+
     for name, output in outputs.items():
         if not cv2.imwrite(str(output_dir / name), output):
             print(f"could not write {output_dir / name}", file=sys.stderr)
@@ -146,6 +174,13 @@ def main(argv=None) -> None:
         help="angle (deg, clockwise) at which the 20 appears in the image; resolves the 36-deg ambiguity",
     )
     ap.add_argument("--out", default="out", help="output directory")
+    ap.add_argument(
+        "--detect-darts",
+        "--score",
+        dest="detect_darts",
+        action="store_true",
+        help="detect darts and calculate turn score",
+    )
     a = ap.parse_args(argv)
 
     source = Path(a.image)

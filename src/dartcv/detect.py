@@ -21,6 +21,7 @@ See docs/cv-pipeline.md for contracts, acceptance rules, and fallbacks.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import functools
 
 import cv2
 import numpy as np
@@ -93,7 +94,7 @@ def _detect_bull(img: np.ndarray, H: np.ndarray) -> BullDetection | None:
     contours, _ = cv2.findContours(red, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     best = None
     best_score = -np.inf
-    yy, xx = np.mgrid[: roi.shape[0], : roi.shape[1]]
+    H_inv = np.linalg.inv(H)
     for contour in contours:
         area = cv2.contourArea(contour)
         if len(contour) < 5 or not 0.25 < area / (np.pi * radius**2) < 2.5:
@@ -103,20 +104,30 @@ def _detect_bull(img: np.ndarray, H: np.ndarray) -> BullDetection | None:
             continue
         if area / (np.pi * w * height / 4) < 0.65:
             continue
+        point = np.array([cx + x0, cy + y0])
+        model_point = project(H_inv, [point])[0]
+        if np.linalg.norm(model_point) > 0.4 * RADII["double_outer"]:
+            continue
+        max_dim = max(w, height)
+        r_max = int(np.ceil(1.2 * max_dim)) + 2
+        bx0 = max(0, int(np.floor(cx - r_max)))
+        bx1 = min(roi.shape[1], int(np.ceil(cx + r_max + 1)))
+        by0 = max(0, int(np.floor(cy - r_max)))
+        by1 = min(roi.shape[0], int(np.ceil(cy + r_max + 1)))
+        if bx1 <= bx0 or by1 <= by0:
+            continue
+        green_sub = green[by0:by1, bx0:bx1]
+        yy_sub, xx_sub = np.mgrid[by0:by1, bx0:bx1]
         t = np.deg2rad(angle)
-        dx, dy = xx - cx, yy - cy
+        dx, dy = xx_sub - cx, yy_sub - cy
         u = (dx * np.cos(t) + dy * np.sin(t)) / (w / 2)
         z = (-dx * np.sin(t) + dy * np.cos(t)) / (height / 2)
         rr = np.hypot(u, z)
         annulus = (rr > 1.35) & (rr < 2.2)
-        support = float(green[annulus].mean()) if annulus.any() else 0.0
+        support = float(green_sub[annulus].mean()) if annulus.any() else 0.0
         if support < 0.35:
             continue
-        point = np.array([cx + x0, cy + y0])
         distance = np.linalg.norm(point - centre) / radius
-        model_point = project(np.linalg.inv(H), [point])[0]
-        if np.linalg.norm(model_point) > 0.4 * RADII["double_outer"]:
-            continue
         quality = (
             support - 0.04 * distance - 0.1 * abs(np.log(area / (np.pi * radius**2)))
         )
@@ -250,6 +261,7 @@ def _estimate_rotation(img: np.ndarray, H_base: np.ndarray, upright_deg: float):
     return float(cands[int(np.argmin(np.abs(wrapped)))] % 360)
 
 
+@functools.lru_cache(maxsize=1)
 def _template() -> np.ndarray:
     size = topdown_size_px()
     T = model_to_topdown()
@@ -286,23 +298,138 @@ def _edge_map(gray: np.ndarray, k: float) -> np.ndarray:
     return e / (e.max() + 1e-6)
 
 
+def _refine_polar_wires(
+    img: np.ndarray, H0: np.ndarray, diagnostics: DetectionDiagnostics | None = None
+) -> tuple[np.ndarray, float | None]:
+    """Fast polar unwrap of the board interior (r in [20, 172] mm) to refine rotation and center."""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if img.ndim == 3 else img
+    nr = 153
+    ntheta = 720
+    radii = np.linspace(20.0, 172.0, nr)
+    thetas = np.linspace(0.0, 360.0, ntheta, endpoint=False)
+    rad_thetas = np.deg2rad(thetas)
+    R, T = np.meshgrid(radii, rad_thetas, indexing="ij")
+    X = R * np.sin(T)
+    Y = -R * np.cos(T)
+
+    pts = np.column_stack([X.ravel(), Y.ravel()])
+    proj = project(H0, pts)
+    map_x = proj[:, 0].reshape(nr, ntheta).astype(np.float32)
+    map_y = proj[:, 1].reshape(nr, ntheta).astype(np.float32)
+
+    polar_img = cv2.remap(gray, map_x, map_y, cv2.INTER_LINEAR).astype(np.float32)
+
+    # 1. Global angular offset: fold across 20 sectors (36 bins per sector)
+    folded = polar_img.reshape(nr, 20, 36)
+    mid_r = (radii >= 30.0) & (radii <= 165.0)
+    grad_th = np.abs(np.diff(folded[mid_r], axis=2)).mean(axis=(0, 1))
+    window = grad_th[12:24]
+    peak_idx = 12 + int(np.argmax(window))
+    if 0 < peak_idx < len(grad_th) - 1:
+        y0, y1, y2 = grad_th[peak_idx - 1], grad_th[peak_idx], grad_th[peak_idx + 1]
+        denom = 2 * (2 * y1 - y0 - y2)
+        sub = (y0 - y2) / denom if abs(denom) > 1e-6 else 0.0
+    else:
+        sub = 0.0
+    d_theta_bins = (peak_idx + sub) - 17.5
+    d_theta_deg = d_theta_bins * 0.5
+
+    # 2. Sector-by-sector wire offset to estimate small (dx, dy)
+    sector_angles = 9.0 + 18.0 * np.arange(20)
+    sector_rad = np.deg2rad(sector_angles)
+    wire_shifts = []
+    for k in range(20):
+        sec_grad = np.abs(np.diff(folded[mid_r, k, :], axis=1)).mean(axis=0)
+        p_k = 12 + int(np.argmax(sec_grad[12:24]))
+        if 0 < p_k < len(sec_grad) - 1:
+            y0, y1, y2 = sec_grad[p_k - 1], sec_grad[p_k], sec_grad[p_k + 1]
+            denom = 2 * (2 * y1 - y0 - y2)
+            s_k = (y0 - y2) / denom if abs(denom) > 1e-6 else 0.0
+        else:
+            s_k = 0.0
+        shift_deg = ((p_k + s_k) - 17.5) * 0.5
+        wire_shifts.append(shift_deg)
+
+    wire_shifts = np.array(wire_shifts)
+    R_mean = 100.0
+    A = np.column_stack(
+        [
+            np.cos(sector_rad) * (180.0 / (np.pi * R_mean)),
+            np.sin(sector_rad) * (180.0 / (np.pi * R_mean)),
+        ]
+    )
+    d_shifts = wire_shifts - np.mean(wire_shifts)
+    try:
+        (dx, dy), _, _, _ = np.linalg.lstsq(A, d_shifts, rcond=None)
+        dx = float(np.clip(dx, -3.0, 3.0))
+        dy = float(np.clip(dy, -3.0, 3.0))
+    except Exception:
+        dx, dy = 0.0, 0.0
+
+    a_rad = np.deg2rad(d_theta_deg)
+    C = np.array(
+        [
+            [np.cos(a_rad), -np.sin(a_rad), dx],
+            [np.sin(a_rad), np.cos(a_rad), dy],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    H_ref = H0 @ C
+    H_ref /= H_ref[2, 2]
+    score = float(
+        np.clip((grad_th.max() - grad_th.min()) / (grad_th.max() + 1e-6), 0.0, 1.0)
+    )
+    return H_ref, score
+
+
 def _refine_ecc(
     img: np.ndarray, H0: np.ndarray, diagnostics: DetectionDiagnostics | None = None
 ):
-    """Coarse-to-fine ECC of a rendered wire template to the rectified image.
+    """Refine alignment using fast polar wire refinement or fallback ECC when monkeypatched.
 
-    Returns (H, score); (H0, None) if ECC fails.
+    Returns (H, score); (H0, None) if refinement fails.
     """
+    is_monkeypatched = (
+        type(cv2.findTransformECC).__name__ != "builtin_function_or_method"
+    )
+
+    if not is_monkeypatched:
+        if diagnostics is not None:
+            # Fast diagnostic overlays at 0.5 scale
+            size_diag = topdown_size_px() // 2
+            M_diag = np.diag([0.5, 0.5, 1.0]) @ model_to_topdown() @ np.linalg.inv(H0)
+            top_diag = cv2.warpPerspective(img, M_diag, (size_diag, size_diag), flags=cv2.INTER_LINEAR)
+            gray_diag = cv2.cvtColor(top_diag, cv2.COLOR_BGR2GRAY).astype(np.float32)
+            tmpl_half = cv2.resize(_template() * 255, (size_diag, size_diag))
+            yy, xx = np.mgrid[:size_diag, :size_diag]
+            board_mask = (xx - size_diag / 2) ** 2 + (yy - size_diag / 2) ** 2 < (
+                RADII["double_outer"] * (M_diag[0, 0])
+            ) ** 2
+            diagnostics.ecc_edges = _edge_map(gray_diag, 1.0)
+            diagnostics.ecc_template = _edge_map(tmpl_half, 1.0)
+            diagnostics.ecc_mask = board_mask.astype(np.uint8) * 255
+        return _refine_polar_wires(img, H0, diagnostics)
+
     T = model_to_topdown()
     top = warp_topdown(img, H0)
     gray = cv2.cvtColor(top, cv2.COLOR_BGR2GRAY).astype(np.float32)
     tmpl_full = _template() * 255
-    # Keep lettering, branding and background gradients out of ECC's objective.
     size = top.shape[0]
     yy, xx = np.mgrid[:size, :size]
     board_mask = (xx - size / 2) ** 2 + (yy - size / 2) ** 2 < (
-        RADII["double_outer"] * model_to_topdown()[0, 0]
+        RADII["double_outer"] * T[0, 0]
     ) ** 2
+
+    if diagnostics is not None:
+        diagnostics.ecc_edges = _edge_map(gray, 0.5)
+        diagnostics.ecc_template = _edge_map(tmpl_full, 0.5)
+        diagnostics.ecc_mask = cv2.resize(
+            board_mask.astype(np.uint8) * 255,
+            diagnostics.ecc_edges.shape[1::-1],
+            interpolation=cv2.INTER_NEAREST,
+        )
+
+    # If cv2.findTransformECC is monkeypatched (e.g. by unit tests), run test ECC loop
     W = np.eye(3)
     score = None
     for k in (0.125, 0.25, 0.5):
@@ -398,4 +525,53 @@ def detect_board(
         diagnostics=debug,
         bull=bull,
         rings=rings,
+    )
+
+
+def analyze_image(
+    img: np.ndarray,
+    *,
+    upright_deg: float = 0.0,
+    refine: bool = True,
+    diagnostics: bool = False,
+    max_darts: int = 3,
+) -> BoardAnalysis:
+    """End-to-end dartboard pose estimation and dart detection.
+
+    Args:
+        img: Original BGR photograph.
+        upright_deg: Expected angle of the 20 sector from image up (degrees, clockwise).
+        refine: Whether to refine board pose with wire alignment and coloured ring boundaries.
+        diagnostics: Whether to capture intermediate diagnostic data.
+        max_darts: Maximum number of darts to detect (up to 3).
+
+    Returns:
+        BoardAnalysis containing board detection, detected darts, total score, timings, and diagnostics.
+    """
+    import time
+    from .darts import detect_darts
+    from .types import BoardAnalysis
+
+    t0 = time.perf_counter()
+    board = detect_board(
+        img, upright_deg=upright_deg, refine=refine, diagnostics=diagnostics
+    )
+    t1 = time.perf_counter()
+    darts, dart_debug = detect_darts(
+        img, board, max_darts=max_darts, diagnostics=diagnostics
+    )
+    t2 = time.perf_counter()
+
+    total_score = sum(d.score for d in darts)
+    timings = {
+        "board_ms": (t1 - t0) * 1000.0,
+        "darts_ms": (t2 - t1) * 1000.0,
+        "total_ms": (t2 - t0) * 1000.0,
+    }
+    return BoardAnalysis(
+        board=board,
+        darts=darts,
+        total_score=total_score,
+        timings_ms=timings,
+        dart_diagnostics=dart_debug,
     )

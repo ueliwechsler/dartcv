@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-from scipy.optimize import least_squares
 
 from .geometry import RADII, contour_radius, project
 
@@ -143,6 +142,95 @@ def _fit_boundary(
     return RingBoundary(points, contour, keep, float(np.median(distances[keep])))
 
 
+def _solve_ring_perspective_irls(
+    original_model: np.ndarray, targets: np.ndarray
+) -> np.ndarray:
+    """Solve 5-parameter ring perspective correction via pure-NumPy Gauss-Newton / IRLS."""
+    p = np.array([1.0, 0.0, 1.0, 0.0, 0.0], dtype=np.float64)
+    lower = np.array([0.85, -0.1, 0.85, -0.1, -0.1], dtype=np.float64)
+    upper = np.array([1.15, 0.1, 1.15, 0.1, 0.1], dtype=np.float64)
+    X = original_model[:, 0]
+    Y = original_model[:, 1]
+    n_pts = len(targets)
+
+    scale = 0.5
+    scale_sq = scale * scale
+    inv_scale = 2.0
+
+    def _eval(p_cur):
+        det = p_cur[0] * p_cur[2] - p_cur[1] * p_cur[1]
+        inv_det = 1.0 / det
+        s00 = p_cur[2] * inv_det
+        s01 = -p_cur[1] * inv_det
+        s11 = p_cur[0] * inv_det
+        xt = X * s00 + Y * s01
+        yt = X * s01 + Y * s11
+        w = 1.0 - (xt * (p_cur[3] * (1.0 / 170.0)) + yt * (p_cur[4] * (1.0 / 170.0)))
+        inv_w = 1.0 / w
+        u = xt * inv_w
+        v = yt * inv_w
+        r = np.hypot(u, v)
+        return r - targets, u, v, r, s00, s01, s11, inv_w
+
+    res, u, v, r, s00, s01, s11, inv_w = _eval(p)
+    loss = np.sum(2.0 * scale_sq * (np.sqrt(1.0 + (res * inv_scale) ** 2) - 1.0))
+    J = np.empty((n_pts, 5), dtype=np.float64)
+
+    for _ in range(12):
+        ur = u / r
+        vr = v / r
+        c3 = p[3] * (1.0 / 170.0)
+        c4 = p[4] * (1.0 / 170.0)
+
+        # Analytical Jacobian
+        dxt0 = -X * (s00 * s00) - Y * (s00 * s01)
+        dyt0 = -X * (s00 * s01) - Y * (s01 * s01)
+        dw0 = -(c3 * dxt0 + c4 * dyt0)
+        J[:, 0] = ur * (dxt0 - u * dw0) * inv_w + vr * (dyt0 - v * dw0) * inv_w
+
+        dxt1 = -X * (2.0 * s00 * s01) - Y * (s00 * s11 + s01 * s01)
+        dyt1 = -X * (s00 * s11 + s01 * s01) - Y * (2.0 * s01 * s11)
+        dw1 = -(c3 * dxt1 + c4 * dyt1)
+        J[:, 1] = ur * (dxt1 - u * dw1) * inv_w + vr * (dyt1 - v * dw1) * inv_w
+
+        dxt2 = -X * (s01 * s01) - Y * (s01 * s11)
+        dyt2 = -X * (s01 * s11) - Y * (s11 * s11)
+        dw2 = -(c3 * dxt2 + c4 * dyt2)
+        J[:, 2] = ur * (dxt2 - u * dw2) * inv_w + vr * (dyt2 - v * dw2) * inv_w
+
+        J[:, 3] = (u * r) * (1.0 / 170.0)
+        J[:, 4] = (v * r) * (1.0 / 170.0)
+
+        w_huber = 1.0 / np.sqrt(1.0 + (res * inv_scale) ** 2)
+        Jw = J.T * w_huber
+        H_mat = Jw @ J + 1e-4 * np.eye(5, dtype=np.float64)
+        g = Jw @ res
+
+        try:
+            dp = -np.linalg.solve(H_mat, g)
+        except np.linalg.LinAlgError:
+            break
+
+        step_accepted = False
+        step = 1.0
+        for _ in range(4):
+            p_cand = np.clip(p + step * dp, lower, upper)
+            res_cand, u_cand, v_cand, r_cand, s00_cand, s01_cand, s11_cand, inv_w_cand = _eval(p_cand)
+            loss_cand = np.sum(2.0 * scale_sq * (np.sqrt(1.0 + (res_cand * inv_scale) ** 2) - 1.0))
+            if loss_cand < loss:
+                p = p_cand
+                res, u, v, r, s00, s01, s11, inv_w = res_cand, u_cand, v_cand, r_cand, s00_cand, s01_cand, s11_cand, inv_w_cand
+                loss = loss_cand
+                step_accepted = True
+                break
+            step *= 0.5
+
+        if not step_accepted or np.max(np.abs(step * dp)) < 1e-5:
+            break
+
+    return p
+
+
 def refine_coloured_rings(
     img: np.ndarray, H: np.ndarray
 ) -> tuple[np.ndarray, dict[str, RingBoundary]]:
@@ -155,13 +243,35 @@ def refine_coloured_rings(
     measured = _sample_bands(img, H)
     refined = H.copy()
     if len(measured) == 4:
+        in_dbl = project(np.linalg.inv(H), measured["double_inner"])
+        out_dbl = project(np.linalg.inv(H), measured["double_outer"])
+        w_dbl = float(
+            np.median(
+                np.hypot(out_dbl[:, 0], out_dbl[:, 1])
+                - np.hypot(in_dbl[:, 0], in_dbl[:, 1])
+            )
+        )
+        tgt_dbl_mid = RADII["double_outer"] - w_dbl / 2.0
+
+        in_trb = project(np.linalg.inv(H), measured["treble_inner"])
+        out_trb = project(np.linalg.inv(H), measured["treble_outer"])
+        w_trb = float(
+            np.median(
+                np.hypot(out_trb[:, 0], out_trb[:, 1])
+                - np.hypot(in_trb[:, 0], in_trb[:, 1])
+            )
+        )
+        tgt_trb_mid = RADII["treble_outer"] - w_trb / 2.0
+
         midpoints, targets = [], []
-        for inner, outer in BANDS:
-            inside = project(np.linalg.inv(H), measured[inner])
-            outside = project(np.linalg.inv(H), measured[outer])
-            middle = project(H, (inside + outside) / 2)
-            midpoints.extend(middle)
-            targets.extend([(RADII[inner] + RADII[outer]) / 2] * len(middle))
+        m_dbl = project(H, (in_dbl + out_dbl) / 2.0)
+        midpoints.extend(m_dbl)
+        targets.extend([tgt_dbl_mid] * len(m_dbl))
+
+        m_trb = project(H, (in_trb + out_trb) / 2.0)
+        midpoints.extend(m_trb)
+        targets.extend([tgt_trb_mid] * len(m_trb))
+
         original_model = project(np.linalg.inv(H), midpoints).astype(np.float64)
         targets = np.asarray(targets)
 
@@ -171,8 +281,6 @@ def refine_coloured_rings(
             )
 
         def residual(p):
-            # Avoid float32 cv2 projection here: finite-difference optimization
-            # needs float64 precision to estimate derivatives reliably.
             homogeneous = np.column_stack([original_model, np.ones(len(targets))])
             transformed = homogeneous @ np.linalg.inv(correction(p)).T
             return (
@@ -181,18 +289,11 @@ def refine_coloured_rings(
             )
 
         initial = np.array([1.0, 0, 1.0, 0, 0])
-        fit = least_squares(
-            residual,
-            initial,
-            loss="soft_l1",
-            f_scale=0.5,
-            bounds=([0.85, -0.1, 0.85, -0.1, -0.1], [1.15, 0.1, 1.15, 0.1, 0.1]),
-            max_nfev=80,
-        )
-        if fit.success and np.median(np.abs(residual(fit.x))) <= np.median(
+        p_opt = _solve_ring_perspective_irls(original_model, targets)
+        if np.median(np.abs(residual(p_opt))) <= np.median(
             np.abs(residual(initial))
         ):
-            refined = H @ correction(fit.x)
+            refined = H @ correction(p_opt)
             refined /= refined[2, 2]
             measured = _sample_bands(img, refined)
 

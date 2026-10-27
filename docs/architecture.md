@@ -3,20 +3,26 @@
 ## Purpose and scope
 
 dartcv estimates a planar dartboard's geometry in a photograph, draws the board
-model, and rectifies the image. It also provides point-scoring helpers and
-synthetic board rendering. It does not currently locate dart tips automatically
-or implement a complete live scoring application.
+model, rectifies the image, and automatically detects and scores darts in single
+images. It also provides an interactive ground-truth annotation and inspection
+web application, a quantitative evaluation harness, and synthetic board
+rendering. It does not implement a continuous multi-camera live video tracking
+application.
 
 ## Components and responsibilities
 
 | Component | Responsibility | Interfaces and dependencies |
 | --- | --- | --- |
 | [cli](../src/dartcv/cli.py) | Argument parsing, image loading, calibration mode selection, batch iteration, output writing | `main()`, `pick_points()`; calls detection, geometry, overlays, and diagnostics |
-| [detect](../src/dartcv/detect.py) | Automatic homography estimation and optional diagnostic capture | `detect_board()` returns `Detection`; uses geometry, overlay transforms, and ring refinement |
-| [rings](../src/dartcv/rings.py) | Full-resolution paint-band sampling, common geometry refinement, independent edge fits | `refine_coloured_rings()` returns a homography and `RingBoundary` mapping; uses SciPy optimization |
+| [detect](../src/dartcv/detect.py) | Automatic homography estimation, dart scoring pipeline, and optional diagnostic capture | `detect_board()`, `analyze_image()`; uses geometry, overlay transforms, and ring refinement |
+| [darts](../src/dartcv/darts.py) | Candidate detection, shaft axis extraction, tip localization, and score computation | `detect_darts()`; returns `DartDetection` list and `DartDiagnostics` |
+| [types](../src/dartcv/types.py) | Shared data structures for board pose, dart localization, and turn analysis | `DartDetection`, `DartDiagnostics`, `BoardAnalysis` |
+| [rings](../src/dartcv/rings.py) | Full-resolution paint-band sampling, common geometry refinement, independent edge fits | `refine_coloured_rings()` returns a homography and `RingBoundary` mapping; uses NumPy optimization |
 | [geometry](../src/dartcv/geometry.py) | Millimetre model, calibration, projection, contour-radius queries, point scoring | `RADII`, `SECTORS`, `compute_homography()`, `project()`, scoring helpers; NumPy/OpenCV |
 | [overlay](../src/dartcv/overlay.py) | Source-image overlays and top-down warping, optionally using fitted paint contours | `draw_overlay()`, `warp_topdown()`, `topdown_overlay()`; geometry and OpenCV |
 | [diagnostics](../src/dartcv/diagnostics.py) | Visual explanations of detection and supplied calibration | `detection_overlays()`, `calibration_overlay()`; consumes detector results |
+| [annotate](../src/dartcv/annotate.py) | Interactive web-based and GUI annotation tool and evaluation dashboard | `main()`, `run_web_annotator()`, `export_standalone_dashboard()`; provides pan/zoom, loupe, real-time score calculation, dual-tab dashboard UI, and unseen image analysis |
+| [evaluate](../src/dartcv/evaluate.py) | Quantitative and visual evaluation harness benchmarking pipeline against ground truth | `main()`, `evaluate_dataset()`; computes bipartite matching, precision/recall, tip error, and reports |
 | [board](../src/dartcv/board.py) | Synthetic visualization in normalized coordinates | Rendering helpers used by the [example notebook](../examples/dartboard_visualization.ipynb); not the detector's metric model |
 
 ## Runtime and data flow
@@ -28,11 +34,14 @@ flowchart TD
     Detect --> Rings[Colour-ring refinement]
     Rings --> Result[Detection: H, contours, optional diagnostics]
     Mode -->|manual or supplied points| Geometry[Four-point homography]
-    Result --> Render[Source and top-down overlays]
+    Result --> ScoreOpt{--score enabled?}
+    ScoreOpt -->|yes| Darts[Single-image dart detection & scoring]
+    Darts --> Render[Source and top-down overlays + score JSON]
+    ScoreOpt -->|no| Render
     Geometry --> Render
     Result --> Debug[Pipeline diagnostics]
     Geometry --> Calib[Supplied-point diagnostic]
-    Render --> Write[CLI: write PNG outputs]
+    Render --> Write[CLI: write PNG and JSON outputs]
     Debug --> Write
     Calib --> Write
 ```
@@ -56,8 +65,10 @@ Library detection returns data without writing files. See the
   can use different resolutions; their dataclass fields document their frames.
 - `Detection.rings` contains fitted contours in original-image pixels. Overlay
   code transforms these for top-down rendering; absent contours remain nominal.
-- Scoring uses nominal `RADII`, not the fitted paint contours. The normalized
-  synthetic renderer is not a replacement for the millimetre geometry model.
+- `score_from_model_point()` and `score_from_image_point()` use nominal `RADII`.
+  `score_point_detailed()` checks fitted `Detection.rings` boundaries when
+  supplied and falls back to nominal `RADII` otherwise. The normalized synthetic
+  renderer is not a replacement for the millimetre geometry model.
 - Supplied calibration points must be the outer-double intersections at
   `20|1`, `6|10`, `3|19`, `11|14`, in that order.
 
@@ -92,19 +103,23 @@ See the [README data workflow](../README.md#pictures-on-google-drive-uv--dvc).
   scoring, detection, CLI outputs, diagnostics, and bull constraints.
 - [Ring tests](../tests/test_rings.py) cover colour-band fitting, refinement,
   occlusion/fallback behavior, and overlay integration.
+- [Dart detection tests](../tests/test_darts.py) cover synthetic clean boards,
+  single-dart and multi-dart localization, cast shadows, oblique angles, and
+  end-to-end `analyze_image()` execution.
 - Run `uv run --group dev pytest`; use one explicitly selected real image for a
   visual check unless a batch evaluation is requested.
 - Synthetic tests and diagnostic fit residuals do not establish real-dataset
-  accuracy. Colour dependence, occlusion, orientation ambiguity, and nominal
-  scoring boundaries remain important limitations.
+  accuracy. Real-dataset performance is benchmarked via `dartcv-eval` against
+  [`data/annotations/ground_truth.json`](../data/annotations/ground_truth.json).
+  Colour dependence, multi-dart occlusion, oblique entry angles, and orientation
+  ambiguity remain important limitations.
 
 ## Related documentation and maintenance
 
 - [README](../README.md): commands, outputs, setup, and data workflows.
-- [CV pipeline](cv-pipeline.md): algorithm stages, frames, acceptance rules,
-  diagnostics, and technical limitations.
-- [Architecture template](templates/architecture.md): required structure for this
-  document; update both when that structure changes.
+- [CV pipeline](cv-pipeline.md): algorithm stages, frames, acceptance rules, diagnostics, and technical limitations.
+- [Ground-Truth Dataset & Evaluation](ground-truth-dataset.md): ground-truth schema, annotation tool, and quantitative evaluation harness.
+- [Architecture template](templates/architecture.md): required structure for this document; update both when that structure changes.
 - [Agent instructions](../AGENTS.md): documentation review and completion rules.
 
 Update this document when module boundaries, dependencies, interfaces, data flow,

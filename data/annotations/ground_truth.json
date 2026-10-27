@@ -1,0 +1,992 @@
+{
+  "version": 1,
+  "starter_15": [
+    "data/images/raw_board/IMG_2086.jpg",
+    "data/images/raw_board/IMG_2092.jpg",
+    "data/images/raw_board/IMG_2100.jpg",
+    "data/images/raw_board/PXL_20261018_123812087.jpg",
+    "data/images/raw_board/PXL_20261018_123851704.jpg",
+    "data/images/single_dart/PXL_20261018_152634348.jpg",
+    "data/images/single_dart/PXL_20261018_152711553.jpg",
+    "data/images/single_dart/PXL_20261018_152805333.jpg",
+    "data/images/single_dart/PXL_20261018_152924982.jpg",
+    "data/images/single_dart/PXL_20261018_153231430.jpg",
+    "data/images/multi_dart/PXL_20261018_154231645.jpg",
+    "data/images/multi_dart/PXL_20261018_154304248.jpg",
+    "data/images/multi_dart/PXL_20261018_154400079.jpg",
+    "data/images/multi_dart/PXL_20261018_154523185.jpg",
+    "data/images/multi_dart/PXL_20261018_154739543.jpg"
+  ],
+  "images": {
+    "data/images/raw_board/IMG_2086.jpg": {
+      "image_path": "data/images/raw_board/IMG_2086.jpg",
+      "calibration_points_px": [
+        [
+          2006.1796875,
+          770.6975708007812
+        ],
+        [
+          3483.0166015625,
+          2786.683349609375
+        ],
+        [
+          1577.6229248046875,
+          4107.40673828125
+        ],
+        [
+          615.6135864257812,
+          2323.93505859375
+        ]
+      ],
+      "wire_grid_points_px": [
+        [
+          2002,
+          771
+        ],
+        [
+          1989,
+          876
+        ],
+        [
+          1917,
+          1430
+        ],
+        [
+          1904,
+          1535
+        ],
+        [
+          1805,
+          2352
+        ],
+        [
+          3484,
+          2781
+        ],
+        [
+          3357,
+          2762
+        ],
+        [
+          2758,
+          2669
+        ],
+        [
+          2658,
+          2653
+        ],
+        [
+          1916,
+          2537
+        ],
+        [
+          1574,
+          4106
+        ],
+        [
+          1589,
+          4013
+        ],
+        [
+          1651,
+          3527
+        ],
+        [
+          1664,
+          3434
+        ],
+        [
+          1766,
+          2671
+        ],
+        [
+          616,
+          2320
+        ],
+        [
+          676,
+          2329
+        ],
+        [
+          1006,
+          2385
+        ],
+        [
+          1070,
+          2395
+        ],
+        [
+          1656,
+          2491
+        ],
+        [
+          1790,
+          2444
+        ],
+        [
+          1839,
+          2521
+        ],
+        [
+          1775,
+          2580
+        ],
+        [
+          1726,
+          2504
+        ]
+      ],
+      "darts": [],
+      "total_score": 0,
+      "verified": true
+    },
+    "data/images/raw_board/IMG_2092.jpg": {
+      "image_path": "data/images/raw_board/IMG_2092.jpg",
+      "calibration_points_px": [
+        [
+          2300.726318359375,
+          1223.984375
+        ],
+        [
+          3346.677734375,
+          2651.608154296875
+        ],
+        [
+          1933.9951171875,
+          3704.32861328125
+        ],
+        [
+          735.4107666015625,
+          2013.1829833984375
+        ]
+      ],
+      "wire_grid_points_px": [
+        [
+          2304,
+          1225
+        ],
+        [
+          2290,
+          1285
+        ],
+        [
+          2241,
+          1620
+        ],
+        [
+          2232,
+          1686
+        ],
+        [
+          2152,
+          2237
+        ],
+        [
+          3347,
+          2646
+        ],
+        [
+          3278,
+          2631
+        ],
+        [
+          2915,
+          2544
+        ],
+        [
+          2842,
+          2527
+        ],
+        [
+          2256,
+          2387
+        ],
+        [
+          1938,
+          3705
+        ],
+        [
+          1951,
+          3617
+        ],
+        [
+          2015,
+          3175
+        ],
+        [
+          2027,
+          3093
+        ],
+        [
+          2116,
+          2476
+        ],
+        [
+          737,
+          2007
+        ],
+        [
+          827,
+          2029
+        ],
+        [
+          1280,
+          2143
+        ],
+        [
+          1365,
+          2164
+        ],
+        [
+          2008,
+          2325
+        ],
+        [
+          2140,
+          2305
+        ],
+        [
+          2186,
+          2368
+        ],
+        [
+          2128,
+          2407
+        ],
+        [
+          2080,
+          2340
+        ]
+      ],
+      "darts": [],
+      "total_score": 0,
+      "verified": true
+    },
+    "data/images/raw_board/IMG_2100.jpg": {
+      "image_path": "data/images/raw_board/IMG_2100.jpg",
+      "calibration_points_px": [
+        [
+          2626.931640625,
+          1578.781982421875
+        ],
+        [
+          3721.17431640625,
+          3327.31787109375
+        ],
+        [
+          1932.9635009765625,
+          4339.6884765625
+        ],
+        [
+          962.154541015625,
+          2632.375732421875
+        ]
+      ],
+      "wire_grid_points_px": [
+        [
+          2628,
+          1579
+        ],
+        [
+          2605,
+          1664
+        ],
+        [
+          2494,
+          2100
+        ],
+        [
+          2473,
+          2180
+        ],
+        [
+          2310,
+          2830
+        ],
+        [
+          3721,
+          3328
+        ],
+        [
+          3625,
+          3307
+        ],
+        [
+          3165,
+          3189
+        ],
+        [
+          3080,
+          3171
+        ],
+        [
+          2409,
+          2999
+        ],
+        [
+          1934,
+          4340
+        ],
+        [
+          1957,
+          4259
+        ],
+        [
+          2066,
+          3830
+        ],
+        [
+          2085,
+          3748
+        ],
+        [
+          2250,
+          3096
+        ],
+        [
+          962,
+          2633
+        ],
+        [
+          1042,
+          2653
+        ],
+        [
+          1445,
+          2755
+        ],
+        [
+          1521,
+          2774
+        ],
+        [
+          2152,
+          2934
+        ],
+        [
+          2290,
+          2906
+        ],
+        [
+          2337,
+          2979
+        ],
+        [
+          2266,
+          3022
+        ],
+        [
+          2222,
+          2949
+        ]
+      ],
+      "darts": [],
+      "total_score": 0,
+      "verified": true
+    },
+    "data/images/raw_board/PXL_20261018_123812087.jpg": {
+      "image_path": "data/images/raw_board/PXL_20261018_123812087.jpg",
+      "calibration_points_px": [
+        [
+          3074.83544921875,
+          1849.4619140625
+        ],
+        [
+          4855.46240234375,
+          4263.63671875
+        ],
+        [
+          2394.427734375,
+          5956.384765625
+        ],
+        [
+          1117.3951416015625,
+          3648.056640625
+        ]
+      ],
+      "wire_grid_points_px": [
+        [
+          3074,
+          1851
+        ],
+        [
+          3053,
+          1973
+        ],
+        [
+          2946,
+          2618
+        ],
+        [
+          2926,
+          2740
+        ],
+        [
+          2767,
+          3720
+        ],
+        [
+          4858,
+          4262
+        ],
+        [
+          4710,
+          4240
+        ],
+        [
+          3990,
+          4120
+        ],
+        [
+          3861,
+          4100
+        ],
+        [
+          2911,
+          3945
+        ],
+        [
+          2393,
+          5956
+        ],
+        [
+          2415,
+          5834
+        ],
+        [
+          2517,
+          5200
+        ],
+        [
+          2538,
+          5080
+        ],
+        [
+          2705,
+          4113
+        ],
+        [
+          1118,
+          3646
+        ],
+        [
+          1205,
+          3660
+        ],
+        [
+          1668,
+          3740
+        ],
+        [
+          1759,
+          3755
+        ],
+        [
+          2564,
+          3887
+        ],
+        [
+          2749,
+          3829
+        ],
+        [
+          2811,
+          3927
+        ],
+        [
+          2720,
+          4001
+        ],
+        [
+          2659,
+          3900
+        ]
+      ],
+      "darts": [],
+      "total_score": 0,
+      "verified": true
+    },
+    "data/images/raw_board/PXL_20261018_123851704.jpg": {
+      "image_path": "data/images/raw_board/PXL_20261018_123851704.jpg",
+      "calibration_points_px": [
+        [
+          3587.253173828125,
+          2261.52392578125
+        ],
+        [
+          4731.03466796875,
+          4280.4892578125
+        ],
+        [
+          2935.203125,
+          5702.2958984375
+        ],
+        [
+          1501.7484130859375,
+          3542.78125
+        ]
+      ],
+      "wire_grid_points_px": [
+        [
+          3588,
+          2262
+        ],
+        [
+          3569,
+          2361
+        ],
+        [
+          3471,
+          2881
+        ],
+        [
+          3453,
+          2979
+        ],
+        [
+          3299,
+          3782
+        ],
+        [
+          4731,
+          4278
+        ],
+        [
+          4650,
+          4261
+        ],
+        [
+          4218,
+          4164
+        ],
+        [
+          4133,
+          4145
+        ],
+        [
+          3418,
+          3983
+        ],
+        [
+          2935,
+          5703
+        ],
+        [
+          2957,
+          5594
+        ],
+        [
+          3062,
+          5041
+        ],
+        [
+          3082,
+          4935
+        ],
+        [
+          3236,
+          4114
+        ],
+        [
+          1502,
+          3541
+        ],
+        [
+          1618,
+          3568
+        ],
+        [
+          2202,
+          3704
+        ],
+        [
+          2306,
+          3728
+        ],
+        [
+          3114,
+          3910
+        ],
+        [
+          3276,
+          3875
+        ],
+        [
+          3333,
+          3961
+        ],
+        [
+          3253,
+          4017
+        ],
+        [
+          3200,
+          3929
+        ]
+      ],
+      "darts": [],
+      "total_score": 0,
+      "verified": true
+    },
+    "data/images/single_dart/PXL_20261018_152634348.jpg": {
+      "image_path": "data/images/single_dart/PXL_20261018_152634348.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3454,
+            3310
+          ],
+          "tail_px": [
+            3976,
+            2408
+          ],
+          "label": "S4",
+          "sector": 4,
+          "multiplier": 1,
+          "score": 4
+        }
+      ],
+      "total_score": 4,
+      "verified": true
+    },
+    "data/images/single_dart/PXL_20261018_152711553.jpg": {
+      "image_path": "data/images/single_dart/PXL_20261018_152711553.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3396,
+            3860
+          ],
+          "tail_px": [
+            4003,
+            3734
+          ],
+          "label": "DBULL",
+          "sector": 50,
+          "multiplier": 2,
+          "score": 50
+        }
+      ],
+      "total_score": 50,
+      "verified": true
+    },
+    "data/images/single_dart/PXL_20261018_152805333.jpg": {
+      "image_path": "data/images/single_dart/PXL_20261018_152805333.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            2116,
+            4172
+          ],
+          "tail_px": [
+            1058,
+            3318
+          ],
+          "label": "S16",
+          "sector": 16,
+          "multiplier": 1,
+          "score": 16
+        }
+      ],
+      "total_score": 16,
+      "verified": true
+    },
+    "data/images/single_dart/PXL_20261018_152924982.jpg": {
+      "image_path": "data/images/single_dart/PXL_20261018_152924982.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            2770,
+            2580
+          ],
+          "tail_px": [
+            1483,
+            2120
+          ],
+          "label": "T20",
+          "sector": 20,
+          "multiplier": 3,
+          "score": 60
+        }
+      ],
+      "total_score": 60,
+      "verified": true
+    },
+    "data/images/single_dart/PXL_20261018_153231430.jpg": {
+      "image_path": "data/images/single_dart/PXL_20261018_153231430.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            2551,
+            2848
+          ],
+          "tail_px": [
+            1427,
+            1834
+          ],
+          "label": "S5",
+          "sector": 5,
+          "multiplier": 1,
+          "score": 5
+        }
+      ],
+      "total_score": 5,
+      "verified": true
+    },
+    "data/images/multi_dart/PXL_20261018_154231645.jpg": {
+      "image_path": "data/images/multi_dart/PXL_20261018_154231645.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3407,
+            3978
+          ],
+          "tail_px": [
+            4087,
+            3287
+          ],
+          "label": "S13",
+          "sector": 13,
+          "multiplier": 1,
+          "score": 13
+        },
+        {
+          "tip_px": [
+            2889,
+            3558
+          ],
+          "tail_px": [
+            3173,
+            2656
+          ],
+          "label": "S12",
+          "sector": 12,
+          "multiplier": 1,
+          "score": 12
+        },
+        {
+          "tip_px": [
+            2978,
+            2668
+          ],
+          "tail_px": [
+            3262,
+            1484
+          ],
+          "label": "S20",
+          "sector": 20,
+          "multiplier": 1,
+          "score": 20
+        }
+      ],
+      "total_score": 45,
+      "verified": true
+    },
+    "data/images/multi_dart/PXL_20261018_154304248.jpg": {
+      "image_path": "data/images/multi_dart/PXL_20261018_154304248.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3310,
+            3743
+          ],
+          "tail_px": [
+            4658,
+            3461
+          ],
+          "label": "S18",
+          "sector": 18,
+          "multiplier": 1,
+          "score": 18
+        },
+        {
+          "tip_px": [
+            3353,
+            3660
+          ],
+          "tail_px": [
+            4888,
+            3792
+          ],
+          "label": "S18",
+          "sector": 18,
+          "multiplier": 1,
+          "score": 18
+        },
+        {
+          "tip_px": [
+            3463,
+            2942
+          ],
+          "tail_px": [
+            4812,
+            2873
+          ],
+          "label": "S1",
+          "sector": 1,
+          "multiplier": 1,
+          "score": 1
+        }
+      ],
+      "total_score": 37,
+      "verified": true
+    },
+    "data/images/multi_dart/PXL_20261018_154400079.jpg": {
+      "image_path": "data/images/multi_dart/PXL_20261018_154400079.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3646,
+            4326
+          ],
+          "tail_px": [
+            4588,
+            3987
+          ],
+          "label": "S15",
+          "sector": 15,
+          "multiplier": 1,
+          "score": 15
+        },
+        {
+          "tip_px": [
+            2653,
+            4063
+          ],
+          "tail_px": [
+            3610,
+            3731
+          ],
+          "label": "S8",
+          "sector": 8,
+          "multiplier": 1,
+          "score": 8
+        },
+        {
+          "tip_px": [
+            3206,
+            3327
+          ],
+          "tail_px": [
+            4084,
+            2987
+          ],
+          "label": "S1",
+          "sector": 1,
+          "multiplier": 1,
+          "score": 1
+        }
+      ],
+      "total_score": 24,
+      "verified": true
+    },
+    "data/images/multi_dart/PXL_20261018_154523185.jpg": {
+      "image_path": "data/images/multi_dart/PXL_20261018_154523185.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3108,
+            3761
+          ],
+          "tail_px": [
+            2810,
+            2288
+          ],
+          "label": "S18",
+          "sector": 18,
+          "multiplier": 1,
+          "score": 18
+        },
+        {
+          "tip_px": [
+            2557,
+            3948
+          ],
+          "tail_px": [
+            1303,
+            2453
+          ],
+          "label": "S9",
+          "sector": 9,
+          "multiplier": 1,
+          "score": 9
+        },
+        {
+          "tip_px": [
+            2621,
+            3659
+          ],
+          "tail_px": [
+            1023,
+            2045
+          ],
+          "label": "S5",
+          "sector": 5,
+          "multiplier": 1,
+          "score": 5
+        }
+      ],
+      "total_score": 32,
+      "verified": true
+    },
+    "data/images/multi_dart/PXL_20261018_154739543.jpg": {
+      "image_path": "data/images/multi_dart/PXL_20261018_154739543.jpg",
+      "calibration_points_px": null,
+      "darts": [
+        {
+          "tip_px": [
+            3777,
+            5143
+          ],
+          "tail_px": [
+            4833,
+            5530
+          ],
+          "label": "D17",
+          "sector": 17,
+          "multiplier": 2,
+          "score": 34
+        },
+        {
+          "tip_px": [
+            4113,
+            4990
+          ],
+          "tail_px": [
+            5131,
+            4913
+          ],
+          "label": "D2",
+          "sector": 2,
+          "multiplier": 2,
+          "score": 4
+        },
+        {
+          "tip_px": [
+            4562,
+            5083
+          ],
+          "tail_px": [
+            5801,
+            5493
+          ],
+          "label": "MISS",
+          "sector": 0,
+          "multiplier": 0,
+          "score": 0
+        }
+      ],
+      "total_score": 38,
+      "verified": true
+    }
+  }
+}
